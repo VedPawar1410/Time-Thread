@@ -1,0 +1,1 @@
+Always use TypeScript with strict types. Prefer functional components and Shadcn UI. For Python, use Pydantic models for all API responses. When explaining code, be concise and highlight the 'why' behind the logic

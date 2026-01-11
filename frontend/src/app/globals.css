@@ -1,0 +1,143 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    /* Warm, sophisticated dark theme inspired by IDE aesthetics */
+    --background: 240 10% 3.9%;
+    --foreground: 0 0% 98%;
+    --card: 240 10% 5.9%;
+    --card-foreground: 0 0% 98%;
+    --popover: 240 10% 5.9%;
+    --popover-foreground: 0 0% 98%;
+    --primary: 47 96% 53%;
+    --primary-foreground: 240 10% 3.9%;
+    --secondary: 240 5% 14%;
+    --secondary-foreground: 0 0% 98%;
+    --muted: 240 5% 14%;
+    --muted-foreground: 240 5% 64%;
+    --accent: 240 5% 14%;
+    --accent-foreground: 0 0% 98%;
+    --destructive: 0 62% 50%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 240 5% 17%;
+    --input: 240 5% 17%;
+    --ring: 47 96% 53%;
+    --radius: 0.625rem;
+
+    /* Chart colors */
+    --chart-1: 47 96% 53%;
+    --chart-2: 173 58% 39%;
+    --chart-3: 197 37% 24%;
+    --chart-4: 43 74% 66%;
+    --chart-5: 27 87% 67%;
+
+    /* Node type colors */
+    --node-topic: 47 96% 53%;
+    --node-subtopic: 173 58% 45%;
+    --node-question: 262 83% 58%;
+    --node-answer: 142 71% 45%;
+    --node-insight: 27 87% 67%;
+  }
+
+  .light {
+    --background: 0 0% 100%;
+    --foreground: 240 10% 3.9%;
+    --card: 0 0% 100%;
+    --card-foreground: 240 10% 3.9%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 240 10% 3.9%;
+    --primary: 47 96% 45%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 240 4.8% 95.9%;
+    --secondary-foreground: 240 5.9% 10%;
+    --muted: 240 4.8% 95.9%;
+    --muted-foreground: 240 3.8% 46.1%;
+    --accent: 240 4.8% 95.9%;
+    --accent-foreground: 240 5.9% 10%;
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 240 5.9% 90%;
+    --input: 240 5.9% 90%;
+    --ring: 47 96% 45%;
+
+    /* Node type colors - light mode */
+    --node-topic: 47 96% 45%;
+    --node-subtopic: 173 58% 35%;
+    --node-question: 262 83% 48%;
+    --node-answer: 142 71% 35%;
+    --node-insight: 27 87% 57%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground antialiased;
+  }
+}
+
+/* React Flow custom styles */
+.react-flow__node {
+  @apply transition-all duration-200;
+}
+
+.react-flow__node:hover {
+  @apply scale-105;
+}
+
+.react-flow__edge-path {
+  @apply stroke-2;
+}
+
+.react-flow__controls {
+  @apply bg-card border-border rounded-lg shadow-lg;
+}
+
+.react-flow__controls-button {
+  @apply bg-card border-border text-foreground hover:bg-secondary;
+}
+
+.react-flow__minimap {
+  @apply bg-card/80 rounded-lg shadow-lg backdrop-blur-sm;
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  @apply bg-transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  @apply bg-muted-foreground/20 rounded-full;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  @apply bg-muted-foreground/40;
+}
+
+/* Animation utilities */
+@layer utilities {
+  .animate-in {
+    animation: animate-in 0.3s ease-out;
+  }
+
+  @keyframes animate-in {
+    from {
+      opacity: 0;
+      transform: translateY(-4px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+}
