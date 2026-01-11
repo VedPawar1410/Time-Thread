@@ -30,6 +30,9 @@ class Settings(BaseSettings):
     # OpenAI (for future AI processing)
     openai_api_key: str = ""
 
+    # Google Gemini
+    google_api_key: str = "AIzaSyDTqfRnWMFeDF1DEy8v2aeJNhgOuVhI4LY"
+
 
 @lru_cache
 def get_settings() -> Settings:

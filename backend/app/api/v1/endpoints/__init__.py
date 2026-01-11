@@ -1,5 +1,5 @@
 """API v1 endpoints."""
 
-from app.api.v1.endpoints import graphs, transcription
+from app.api.v1.endpoints import graphs, process, transcription
 
-__all__ = ["graphs", "transcription"]
+__all__ = ["graphs", "process", "transcription"]

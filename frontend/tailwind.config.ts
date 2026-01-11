@@ -57,6 +57,8 @@ const config: Config = {
           question: "hsl(var(--node-question))",
           answer: "hsl(var(--node-answer))",
           insight: "hsl(var(--node-insight))",
+          main: "hsl(var(--node-main))",
+          tangent: "hsl(var(--node-tangent))",
         },
       },
       borderRadius: {

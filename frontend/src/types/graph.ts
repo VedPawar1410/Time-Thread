@@ -7,8 +7,10 @@ import type { Node, Edge } from "@xyflow/react";
 
 /** Types of nodes in the conversation graph */
 export type NodeType =
-  | "topic"
+  | "main"
   | "subtopic"
+  | "tangent"
+  | "topic"
   | "question"
   | "answer"
   | "insight"
@@ -21,7 +23,10 @@ export type EdgeType =
   | "branches_to"
   | "references"
   | "responds_to"
-  | "contains";
+  | "contains"
+  | "interruption"
+  | "return_to_topic"
+  | "tangent";
 
 /** Source types for transcription */
 export type SourceType = "youtube" | "pdf" | "audio" | "text";
@@ -97,4 +102,40 @@ export interface TranscriptionResult {
   fullText: string;
   metadata: Record<string, unknown>;
   duration?: number;
+}
+
+// --- AI Processing Types (matches backend Pydantic models) ---
+
+/** A node extracted by AI from transcript analysis */
+export interface ProcessedNode {
+  id: string;
+  label: string;
+  type: "main" | "subtopic" | "tangent";
+  start_time: string; // Format: 'MM:SS' or 'HH:MM:SS'
+  end_time: string;
+  speaker: string | null;
+  summary: string;
+}
+
+/** An edge/relationship extracted by AI from transcript analysis */
+export interface ProcessedEdge {
+  source: string;
+  target: string;
+  label: "follows" | "interruption" | "return_to_topic" | "branches_to" | "tangent";
+}
+
+/** Structured response from AI transcript processing */
+export interface AIGraphResponse {
+  nodes: ProcessedNode[];
+  edges: ProcessedEdge[];
+}
+
+/** Response schema for transcript processing */
+export interface ProcessTranscriptResponse {
+  success: boolean;
+  message: string;
+  video_id: string | null;
+  title: string | null;
+  graph: AIGraphResponse | null;
+  raw_transcript: string | null;
 }

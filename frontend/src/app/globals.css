@@ -39,6 +39,8 @@
     --node-question: 262 83% 58%;
     --node-answer: 142 71% 45%;
     --node-insight: 27 87% 67%;
+    --node-main: 47 96% 53%;
+    --node-tangent: 292 84% 61%;
   }
 
   .light {
@@ -68,6 +70,8 @@
     --node-question: 262 83% 48%;
     --node-answer: 142 71% 35%;
     --node-insight: 27 87% 57%;
+    --node-main: 47 96% 45%;
+    --node-tangent: 292 84% 51%;
   }
 }
 
@@ -83,27 +87,78 @@
 
 /* React Flow custom styles */
 .react-flow__node {
-  @apply transition-all duration-200;
+  @apply transition-all duration-300 ease-out;
 }
 
 .react-flow__node:hover {
-  @apply scale-105;
+  @apply scale-[1.02];
+  filter: drop-shadow(0 0 20px rgba(251, 191, 36, 0.15));
+}
+
+.react-flow__node.selected {
+  filter: drop-shadow(0 0 30px rgba(251, 191, 36, 0.25));
+}
+
+/* Tangent nodes get fuchsia glow */
+.react-flow__node[data-type="tangent"]:hover {
+  filter: drop-shadow(0 0 20px rgba(217, 70, 239, 0.2));
+}
+
+.react-flow__node[data-type="tangent"].selected {
+  filter: drop-shadow(0 0 30px rgba(217, 70, 239, 0.3));
 }
 
 .react-flow__edge-path {
-  @apply stroke-2;
+  @apply stroke-2 transition-all duration-200;
+}
+
+.react-flow__edge:hover .react-flow__edge-path {
+  stroke-width: 3px;
+  filter: drop-shadow(0 0 8px currentColor);
 }
 
 .react-flow__controls {
-  @apply bg-card border-border rounded-lg shadow-lg;
+  @apply rounded-xl shadow-2xl overflow-hidden;
+  background: rgba(0, 0, 0, 0.4) !important;
+  backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.1) !important;
 }
 
 .react-flow__controls-button {
-  @apply bg-card border-border text-foreground hover:bg-secondary;
+  background: transparent !important;
+  border: none !important;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05) !important;
+  color: rgba(255, 255, 255, 0.7) !important;
+  transition: all 0.2s ease;
+}
+
+.react-flow__controls-button:hover {
+  background: rgba(255, 255, 255, 0.1) !important;
+  color: rgba(255, 255, 255, 1) !important;
+}
+
+.react-flow__controls-button:last-child {
+  border-bottom: none !important;
 }
 
 .react-flow__minimap {
-  @apply bg-card/80 rounded-lg shadow-lg backdrop-blur-sm;
+  background: rgba(0, 0, 0, 0.4) !important;
+  backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.1) !important;
+  @apply rounded-xl shadow-2xl;
+}
+
+.react-flow__minimap-mask {
+  fill: rgba(0, 0, 0, 0.85);
+}
+
+/* Handle styles */
+.react-flow__handle {
+  @apply transition-all duration-200;
+}
+
+.react-flow__handle:hover {
+  transform: scale(1.3);
 }
 
 /* Custom scrollbar */
