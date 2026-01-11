@@ -31,8 +31,8 @@ export type EdgeType =
 /** Source types for transcription */
 export type SourceType = "youtube" | "pdf" | "audio" | "text";
 
-/** Data payload for a node */
-export interface NodeData {
+/** Data payload for a node - index signature for React Flow v12 compatibility */
+export interface NodeData extends Record<string, unknown> {
   label: string;
   content: string;
   timestampStart?: number;

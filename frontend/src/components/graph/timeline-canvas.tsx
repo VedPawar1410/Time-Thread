@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useMemo } from "react";
+import { useCallback, useMemo, useEffect, useRef } from "react";
 import {
   ReactFlow,
   Background,
@@ -8,19 +8,25 @@ import {
   MiniMap,
   useNodesState,
   useEdgesState,
+  useReactFlow,
+  ReactFlowProvider,
   BackgroundVariant,
   SmoothStepEdge,
   BezierEdge,
   type Node,
   type Edge,
-  type NodeTypes,
-  type EdgeTypes,
   type NodeMouseHandler,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 
 import { TopicNode, type TopicNodeData } from "./nodes/topic-node";
 import type { AIGraphResponse, ProcessedNode, ProcessedEdge } from "@/types/graph";
+import {
+  useTimelineStore,
+  selectCurrentTime,
+  selectActiveNodeId,
+  selectFollowMode,
+} from "@/stores/timeline-store";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Types
@@ -36,36 +42,41 @@ interface TimelineCanvasProps {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Constants
+// Layout Constants - Spatial Timeline Rule
 // ─────────────────────────────────────────────────────────────────────────────
 
-/** Pixels per second for vertical timeline spacing */
-const PIXELS_PER_SECOND = 3;
+/** Pixels per minute for Y-axis (time) - 100px = 1 minute */
+const PIXELS_PER_MINUTE = 100;
 
-/** Base X position for main timeline nodes */
-const MAIN_TIMELINE_X = 400;
+/** X-axis depth levels */
+const DEPTH_LEVELS = {
+  MAIN: 0,        // Main topics at x = 0
+  SUBTOPIC: 200,  // Side questions/subtopics at x = 200
+  TANGENT: 400,   // Sub-tangents at x = 400
+} as const;
 
-/** X offset for tangent nodes (branching effect) */
-const TANGENT_X_OFFSET = 320;
+/** Minimum vertical spacing between nodes to prevent overlap */
+const MIN_NODE_SPACING = 140;
 
-/** Minimum vertical spacing between nodes */
-const MIN_NODE_SPACING = 120;
+/** Node width for layout calculations */
+const NODE_WIDTH = 260;
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Node & Edge Type Configuration
 // ─────────────────────────────────────────────────────────────────────────────
 
-const nodeTypes: NodeTypes = {
+// Define custom node types - using 'as const' for TypeScript compatibility
+const nodeTypes = {
   main: TopicNode,
   subtopic: TopicNode,
   tangent: TopicNode,
   topic: TopicNode,
-};
+} as const;
 
-const edgeTypes: EdgeTypes = {
+const edgeTypes = {
   smoothstep: SmoothStepEdge,
   default: BezierEdge,
-};
+} as const;
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Utility Functions
@@ -74,9 +85,9 @@ const edgeTypes: EdgeTypes = {
 /**
  * Parse timestamp string (MM:SS or HH:MM:SS) to seconds
  */
-function parseTimestamp(timestamp: string): number {
+export function parseTimestamp(timestamp: string): number {
   const parts = timestamp.split(":").map(Number);
-  
+
   if (parts.length === 3) {
     // HH:MM:SS
     return parts[0] * 3600 + parts[1] * 60 + parts[2];
@@ -84,47 +95,61 @@ function parseTimestamp(timestamp: string): number {
     // MM:SS
     return parts[0] * 60 + parts[1];
   }
-  
+
   return 0;
 }
 
 /**
+ * Get the depth level (X position) based on node type
+ */
+function getDepthLevel(nodeType: string): number {
+  switch (nodeType) {
+    case "main":
+    case "topic":
+      return DEPTH_LEVELS.MAIN;
+    case "subtopic":
+      return DEPTH_LEVELS.SUBTOPIC;
+    case "tangent":
+      return DEPTH_LEVELS.TANGENT;
+    default:
+      return DEPTH_LEVELS.MAIN;
+  }
+}
+
+/**
  * Convert backend ProcessedNode to React Flow Node
+ * Uses Spatial Timeline Rule: Y = time, X = depth
  */
 function convertToFlowNode(
   node: ProcessedNode,
   index: number,
-  allNodes: ProcessedNode[]
-): Node<TopicNodeData> {
+  allNodes: ProcessedNode[],
+  nodePositions: Map<string, { x: number; y: number }>
+): Node {
   const startSeconds = parseTimestamp(node.start_time);
-  const isTangent = node.type === "tangent";
-  
-  // Calculate Y position based on timestamp
-  // Add minimum spacing to prevent overlap
-  let yPosition = startSeconds * PIXELS_PER_SECOND;
-  
-  // Find previous node to ensure minimum spacing
-  const prevNodes = allNodes.slice(0, index);
-  if (prevNodes.length > 0) {
-    const prevNode = prevNodes[prevNodes.length - 1];
-    const prevY = parseTimestamp(prevNode.start_time) * PIXELS_PER_SECOND;
-    const prevHeight = 140; // Estimated node height
-    
-    if (yPosition < prevY + prevHeight + MIN_NODE_SPACING) {
-      yPosition = prevY + prevHeight + MIN_NODE_SPACING;
+  const startMinutes = startSeconds / 60;
+
+  // Y position based on time (100px per minute)
+  let yPosition = startMinutes * PIXELS_PER_MINUTE;
+
+  // X position based on depth (type)
+  const xPosition = getDepthLevel(node.type);
+
+  // Ensure minimum spacing from nodes at the same depth level
+  const nodesAtSameDepth = allNodes
+    .slice(0, index)
+    .filter((n) => getDepthLevel(n.type) === xPosition);
+
+  if (nodesAtSameDepth.length > 0) {
+    const lastNodeAtDepth = nodesAtSameDepth[nodesAtSameDepth.length - 1];
+    const lastPosition = nodePositions.get(lastNodeAtDepth.id);
+    if (lastPosition && yPosition < lastPosition.y + MIN_NODE_SPACING) {
+      yPosition = lastPosition.y + MIN_NODE_SPACING;
     }
   }
-  
-  // X position: offset tangents to the right for branching effect
-  let xPosition = MAIN_TIMELINE_X;
-  if (isTangent) {
-    // Alternate tangents slightly for visual variety
-    const tangentOffset = index % 2 === 0 ? TANGENT_X_OFFSET : TANGENT_X_OFFSET + 40;
-    xPosition = MAIN_TIMELINE_X + tangentOffset;
-  } else if (node.type === "subtopic") {
-    // Subtopics slightly offset to the left
-    xPosition = MAIN_TIMELINE_X - 60;
-  }
+
+  // Store position for subsequent calculations
+  nodePositions.set(node.id, { x: xPosition, y: yPosition });
 
   return {
     id: node.id,
@@ -137,6 +162,7 @@ function convertToFlowNode(
       startTime: node.start_time,
       endTime: node.end_time,
       nodeType: node.type,
+      timestampSeconds: startSeconds,
     },
   };
 }
@@ -144,11 +170,7 @@ function convertToFlowNode(
 /**
  * Convert backend ProcessedEdge to React Flow Edge
  */
-function convertToFlowEdge(
-  edge: ProcessedEdge,
-  nodes: ProcessedNode[]
-): Edge {
-  // Determine if this edge connects to/from a tangent
+function convertToFlowEdge(edge: ProcessedEdge, nodes: ProcessedNode[]): Edge {
   const sourceNode = nodes.find((n) => n.id === edge.source);
   const targetNode = nodes.find((n) => n.id === edge.target);
   const isTangentEdge =
@@ -157,20 +179,24 @@ function convertToFlowEdge(
     edge.label === "tangent" ||
     edge.label === "interruption";
 
+  const isReturnEdge = edge.label === "return_to_topic";
+
   return {
     id: `edge-${edge.source}-${edge.target}`,
     source: edge.source,
     target: edge.target,
-    type: isTangentEdge ? "default" : "smoothstep", // Bezier for tangents, SmoothStep for main
+    type: isTangentEdge || isReturnEdge ? "default" : "smoothstep",
     animated: isTangentEdge,
     style: {
       stroke: isTangentEdge
-        ? "rgba(217, 70, 239, 0.6)" // Fuchsia for tangents
-        : "rgba(251, 191, 36, 0.5)", // Amber for main path
+        ? "rgba(217, 70, 239, 0.6)"
+        : isReturnEdge
+        ? "rgba(156, 163, 175, 0.5)"
+        : "rgba(251, 191, 36, 0.5)",
       strokeWidth: isTangentEdge ? 2 : 2.5,
-      strokeDasharray: edge.label === "return_to_topic" ? "5,5" : undefined,
+      strokeDasharray: isReturnEdge ? "5,5" : undefined,
     },
-    label: edge.label === "return_to_topic" ? "↩ return" : undefined,
+    label: isReturnEdge ? "↩ return" : undefined,
     labelStyle: {
       fill: "rgba(255, 255, 255, 0.6)",
       fontSize: 10,
@@ -183,23 +209,56 @@ function convertToFlowEdge(
   };
 }
 
+/**
+ * Find which node corresponds to the current playback time
+ */
+function findActiveNodeByTime(
+  nodes: Node[],
+  currentTimeSeconds: number
+): string | null {
+  // Find the node whose time range contains the current time
+  for (let i = nodes.length - 1; i >= 0; i--) {
+    const node = nodes[i];
+    const data = node.data as TopicNodeData;
+    if (data.timestampSeconds !== undefined) {
+      if (data.timestampSeconds <= currentTimeSeconds) {
+        return node.id;
+      }
+    }
+  }
+  return nodes.length > 0 ? nodes[0].id : null;
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
-// Component
+// Inner Component (needs ReactFlow context)
 // ─────────────────────────────────────────────────────────────────────────────
 
-export function TimelineCanvas({
+function TimelineCanvasInner({
   graphData,
   onSeekTo,
   className,
 }: TimelineCanvasProps): JSX.Element {
+  const { setCenter, getNode } = useReactFlow();
+
+  // Zustand store
+  const currentTime = useTimelineStore(selectCurrentTime);
+  const activeNodeId = useTimelineStore(selectActiveNodeId);
+  const followMode = useTimelineStore(selectFollowMode);
+  const setActiveNodeId = useTimelineStore((s) => s.setActiveNodeId);
+
+  // Track last centered node to avoid redundant pans
+  const lastCenteredNodeRef = useRef<string | null>(null);
+
   // Convert graph data to React Flow format
   const { initialNodes, initialEdges } = useMemo(() => {
     const sortedNodes = [...graphData.nodes].sort((a, b) => {
       return parseTimestamp(a.start_time) - parseTimestamp(b.start_time);
     });
 
+    const nodePositions = new Map<string, { x: number; y: number }>();
+
     const flowNodes = sortedNodes.map((node, index) =>
-      convertToFlowNode(node, index, sortedNodes)
+      convertToFlowNode(node, index, sortedNodes, nodePositions)
     );
 
     const flowEdges = graphData.edges.map((edge) =>
@@ -209,32 +268,66 @@ export function TimelineCanvas({
     return { initialNodes: flowNodes, initialEdges: flowEdges };
   }, [graphData]);
 
-  const [nodes, , onNodesChange] = useNodesState(initialNodes);
+  const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
   const [edges, , onEdgesChange] = useEdgesState(initialEdges);
 
-  // Handle node click - extract timestamp and call seekTo
-  const handleNodeClick: NodeMouseHandler<Node<TopicNodeData>> = useCallback(
+  // Update active node based on current time
+  useEffect(() => {
+    const newActiveId = findActiveNodeByTime(nodes, currentTime);
+    if (newActiveId && newActiveId !== activeNodeId) {
+      setActiveNodeId(newActiveId);
+    }
+  }, [currentTime, nodes, activeNodeId, setActiveNodeId]);
+
+  // Auto-center on active node (Follow Mode)
+  useEffect(() => {
+    if (!followMode || !activeNodeId) return;
+    if (lastCenteredNodeRef.current === activeNodeId) return;
+
+    const node = getNode(activeNodeId);
+    if (node) {
+      const x = node.position.x + NODE_WIDTH / 2;
+      const y = node.position.y + 70; // Center on node middle
+
+      setCenter(x, y, { zoom: 1, duration: 600 });
+      lastCenteredNodeRef.current = activeNodeId;
+    }
+  }, [activeNodeId, followMode, setCenter, getNode]);
+
+  // Update node selection state based on activeNodeId
+  useEffect(() => {
+    setNodes((nds) =>
+      nds.map((node) => ({
+        ...node,
+        selected: node.id === activeNodeId,
+      }))
+    );
+  }, [activeNodeId, setNodes]);
+
+  // Handle node click
+  const handleNodeClick: NodeMouseHandler = useCallback(
     (_, node) => {
-      if (onSeekTo && node.data.startTime) {
-        const seconds = parseTimestamp(node.data.startTime);
+      setActiveNodeId(node.id);
+      const data = node.data as TopicNodeData;
+      if (onSeekTo && data.startTime) {
+        const seconds = parseTimestamp(data.startTime);
         onSeekTo(seconds);
       }
     },
-    [onSeekTo]
+    [onSeekTo, setActiveNodeId]
   );
 
   // MiniMap node colors
-  const getNodeColor = useCallback((node: Node<TopicNodeData>) => {
+  const getNodeColor = useCallback((node: Node) => {
     const colors: Record<string, string> = {
-      main: "#fbbf24", // Amber
-      subtopic: "#34d399", // Emerald
-      tangent: "#d946ef", // Fuchsia
+      main: "#fbbf24",
+      subtopic: "#34d399",
+      tangent: "#d946ef",
       topic: "#fbbf24",
     };
     return colors[node.type ?? "main"] ?? "#fbbf24";
   }, []);
 
-  // Default edge options
   const defaultEdgeOptions = useMemo(
     () => ({
       style: {
@@ -257,16 +350,14 @@ export function TimelineCanvas({
         edgeTypes={edgeTypes}
         defaultEdgeOptions={defaultEdgeOptions}
         fitView
-        fitViewOptions={{ padding: 0.3 }}
+        fitViewOptions={{ padding: 0.4 }}
         minZoom={0.1}
         maxZoom={2}
         proOptions={{ hideAttribution: true }}
-        // Prevent accidental connections
         nodesDraggable={true}
         nodesConnectable={false}
         elementsSelectable={true}
       >
-        {/* Dotted pattern background */}
         <Background
           variant={BackgroundVariant.Dots}
           gap={24}
@@ -274,7 +365,6 @@ export function TimelineCanvas({
           color="rgba(255, 255, 255, 0.08)"
         />
 
-        {/* Zoom/Pan controls */}
         <Controls
           showZoom
           showFitView
@@ -282,7 +372,6 @@ export function TimelineCanvas({
           className="!bg-black/40 !backdrop-blur-xl !border !border-white/10 !rounded-xl !shadow-2xl"
         />
 
-        {/* Mini map for navigation */}
         <MiniMap
           nodeColor={getNodeColor}
           maskColor="rgba(0, 0, 0, 0.85)"
@@ -293,6 +382,18 @@ export function TimelineCanvas({
         />
       </ReactFlow>
     </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Exported Component (with ReactFlowProvider wrapper)
+// ─────────────────────────────────────────────────────────────────────────────
+
+export function TimelineCanvas(props: TimelineCanvasProps): JSX.Element {
+  return (
+    <ReactFlowProvider>
+      <TimelineCanvasInner {...props} />
+    </ReactFlowProvider>
   );
 }
 
@@ -309,7 +410,8 @@ export const demoGraphData: AIGraphResponse = {
       start_time: "00:00",
       end_time: "02:30",
       speaker: "Host",
-      summary: "Welcome and overview of today's discussion on AI development.",
+      summary:
+        "Welcome and overview of today's discussion on AI development. We'll be covering the history, current state, and future of artificial intelligence.",
     },
     {
       id: "2",
@@ -318,7 +420,8 @@ export const demoGraphData: AIGraphResponse = {
       start_time: "02:30",
       end_time: "08:15",
       speaker: "Guest",
-      summary: "Brief history of artificial intelligence from the 1950s to present day.",
+      summary:
+        "Brief history of artificial intelligence from the 1950s to present day. The Dartmouth Conference, expert systems era, and the AI winters.",
     },
     {
       id: "3",
@@ -327,7 +430,8 @@ export const demoGraphData: AIGraphResponse = {
       start_time: "05:20",
       end_time: "06:45",
       speaker: "Host",
-      summary: "Side discussion about whether the Turing Test is still relevant today.",
+      summary:
+        "Side discussion about whether the Turing Test is still relevant today. Some argue it's outdated, others say it's still the gold standard.",
     },
     {
       id: "4",
@@ -336,7 +440,8 @@ export const demoGraphData: AIGraphResponse = {
       start_time: "08:15",
       end_time: "15:00",
       speaker: "Guest",
-      summary: "Deep dive into large language models and transformer architecture.",
+      summary:
+        "Deep dive into large language models and transformer architecture. Attention mechanisms, scaling laws, and emergent capabilities.",
     },
     {
       id: "5",
@@ -345,7 +450,8 @@ export const demoGraphData: AIGraphResponse = {
       start_time: "10:30",
       end_time: "12:00",
       speaker: "Guest",
-      summary: "Discussion about the environmental and financial costs of training LLMs.",
+      summary:
+        "Discussion about the environmental and financial costs of training LLMs. GPT-4 reportedly cost over $100M to train.",
     },
     {
       id: "6",
@@ -354,7 +460,8 @@ export const demoGraphData: AIGraphResponse = {
       start_time: "13:00",
       end_time: "14:00",
       speaker: "Host",
-      summary: "Host shares a funny story about their first interaction with ChatGPT.",
+      summary:
+        "Host shares a funny story about their first interaction with ChatGPT and how it hallucinated their biography.",
     },
     {
       id: "7",
@@ -363,7 +470,8 @@ export const demoGraphData: AIGraphResponse = {
       start_time: "15:00",
       end_time: "20:00",
       speaker: "Guest",
-      summary: "Predictions for AI development over the next decade.",
+      summary:
+        "Predictions for AI development over the next decade. AGI timelines, regulatory challenges, and societal impacts.",
     },
     {
       id: "8",
@@ -372,7 +480,8 @@ export const demoGraphData: AIGraphResponse = {
       start_time: "20:00",
       end_time: "22:00",
       speaker: "Host",
-      summary: "Summary and farewell to the audience.",
+      summary:
+        "Summary of key takeaways and farewell to the audience. Links to resources mentioned in the discussion.",
     },
   ],
   edges: [

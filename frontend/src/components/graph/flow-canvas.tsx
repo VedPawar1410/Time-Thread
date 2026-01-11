@@ -13,14 +13,13 @@ import {
   type Connection,
   type Node,
   type Edge,
-  type NodeTypes,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 import { TopicNode } from "./nodes/topic-node";
 import type { NodeData } from "@/types/graph";
 
-// Define custom node types
-const nodeTypes: NodeTypes = {
+// Define custom node types - using 'as const' to satisfy TypeScript
+const nodeTypes = {
   topic: TopicNode,
   subtopic: TopicNode,
   question: TopicNode,
@@ -28,10 +27,10 @@ const nodeTypes: NodeTypes = {
   insight: TopicNode,
   quote: TopicNode,
   reference: TopicNode,
-};
+} as const;
 
 // Demo nodes for initial display
-const initialNodes: Node<NodeData>[] = [
+const initialNodes: Node[] = [
   {
     id: "node-1",
     type: "topic",
@@ -115,7 +114,7 @@ export function FlowCanvas(): JSX.Element {
   );
 
   // MiniMap node color based on type
-  const nodeColor = useCallback((node: Node<NodeData>) => {
+  const nodeColor = useCallback((node: Node) => {
     const colors: Record<string, string> = {
       topic: "hsl(47, 96%, 53%)",
       subtopic: "hsl(173, 58%, 45%)",
