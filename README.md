@@ -44,6 +44,8 @@ Every number in this README came from a run on 2026-11-09. Anything not verified
 - **Gemini is called over REST in a worker thread.** The default gRPC transport hung in testing, and async REST crashes in the pinned LangChain version.
 - **Map endpoints are plain `def`.** The Supabase client is synchronous, so FastAPI runs them in a thread pool and the server stays responsive.
 - **Time drives the highlight.** The active node is derived from the current playback time, so the video and graph can't disagree.
+- **Threads update when the topic changes, not on every tick.** Playback time arrives several times a second, but a thread only changes state when a new topic starts, so long videos stay smooth.
+- **The URL decides what's on screen.** A saved map, the sample and a blank start each have their own address, so links are shareable and New Graph can reset cleanly.
 
 ## Data
 
@@ -71,6 +73,7 @@ There is no training dataset. Transcripts come from YouTube captions at request 
 | Run | Result |
 |---|---|
 | Real YouTube video, 2,577-character transcript | 6 nodes in 27 s |
+| Real 19-minute talk, in the browser | 11 nodes, about 50 s |
 | 8-line sample transcript, 3 runs | 5 nodes each, 8.8 to 10.4 s |
 | 107,589-character synthetic transcript | 19 nodes, 18 edges, 24 s |
 
@@ -147,6 +150,7 @@ Graph quality has not been measured. There is no evaluation set yet.
         ├── app/dashboard/page.tsx      Main screen
         ├── components/graph/timeline-canvas.tsx   Graph layout and sync
         ├── components/graph/nodes/topic-node.tsx  Node card
+        ├── components/graph/loom-states.tsx       Empty and waiting screens
         ├── components/layout/sidebar.tsx          Navigation, saved maps
         ├── components/video/video-player.tsx      YouTube player
         ├── components/ui/button.tsx
@@ -276,6 +280,23 @@ One rebuild mistake is worth recording: my CORS fix in 2.1 broke the JSON format
 
 *Known gaps I chose not to fix:* Next.js 16 upgrade, LangChain upgrade, authentication, deployment, an evaluation set for graph quality, frontend tests, a full Docker build.
 
+### Layer 3 - The Loom redesign (November 2026)
+
+*What I did:* After using the working app myself, I added renaming and redesigned the interface around one idea: a conversation is a thread, and it should light up as you watch.
+
+| # | Decision | Why |
+|---|---|---|
+| 3.1 | Chose a concept before any styling | "The Loom" made the name literal and gave every later choice a test. |
+| 3.2 | Kept saturated colour for threads and the main action | Everything else is ink and parchment, so the threads are what you notice. |
+| 3.3 | Updated threads on topic change, not on each time tick | The result only changes when a new topic starts, so per-tick work would be wasted. |
+| 3.4 | Replaced fake demo data with an empty state and a labelled sample | Fake data on first load looks like a real result. |
+| 3.5 | Made the URL the source of truth for what's on screen | It fixed New Graph doing nothing, and gave shareable links and the active-row highlight together. |
+| 3.6 | Labelled timed loading stages honestly | The server doesn't report progress. A real 19-minute talk took about 50 s, so I corrected my first "10 to 30 seconds" copy. |
+| 3.7 | Fixed the sidebar overflow at its cause | Radix's scroll area uses `display: table`, which ignores `truncate`. |
+| 3.8 | Added a `websockets` pin | Supabase's realtime package declares `>=11` but needs 13+, which broke an older virtual environment. |
+
+Two testing mistakes are worth recording. I reported that `npm run dev` loaded slowly, but the browser pane I was testing in was hidden and throttled. And one JSX comment in the wrong place broke the running app, right after I'd described the fix as done.
+
 ### Key takeaways
 
 1. **A passing build is not a working app.** Mine compiled while the video player couldn't load a video.
@@ -286,6 +307,8 @@ One rebuild mistake is worth recording: my CORS fix in 2.1 broke the JSON format
 6. **Fail loudly.** Every silent success here hid a real bug.
 7. **The safest credential is the one the browser never has.**
 8. **A fix can break something elsewhere.** Search for everything that depends on the behaviour you change.
+9. **Check your test setup before trusting its numbers.** A hidden browser tab made a healthy page look slow.
+10. **Design from one idea.** A single concept decided colour, motion and copy, and that's what made it feel designed.
 
 ## Future improvements
 
@@ -299,9 +322,8 @@ One rebuild mistake is worth recording: my CORS fix in 2.1 broke the JSON format
 
 **Product**
 - Fetch real video titles, because maps are currently named "Video <id>".
-- Show progress during the 10 to 30 second wait.
+- Report real progress from the server while processing; the current stages are timed estimates.
 - Cache results by video ID to save quota and YouTube requests.
-- Replace the fake demo graph with an empty state.
 - Save graph edits and node positions.
 - Add PDF, audio and long-document input.
 - From the original plan: searchable nodes, topic importance scoring, sentiment mapping, comparing speakers' perspectives, exportable maps.

@@ -1,92 +1,69 @@
 import Link from "next/link";
-import { ArrowRight, GitBranch, FileText, Zap } from "lucide-react";
+import { ArrowRight, GitBranch } from "lucide-react";
+import { LoomThreads } from "@/components/graph/loom-states";
+
+const steps = [
+  {
+    title: "Paste a link",
+    description: "Any YouTube video with captions.",
+    rule: "bg-node-main",
+  },
+  {
+    title: "Watch it weave",
+    description: "AI finds the main topics, the tangents and the way back.",
+    rule: "bg-node-subtopic",
+  },
+  {
+    title: "Follow the thread",
+    description: "Click any moment to jump there. Threads light up as you watch.",
+    rule: "bg-node-tangent",
+  },
+];
 
 export default function HomePage(): JSX.Element {
   return (
-    <main className="min-h-screen bg-gradient-to-br from-background via-background to-secondary/20">
-      {/* Hero Section */}
-      <div className="container mx-auto px-6 py-20">
-        <div className="flex flex-col items-center text-center space-y-8">
-          {/* Logo/Brand */}
-          <div className="flex items-center gap-3 animate-fade-in">
-            <div className="h-12 w-12 rounded-xl bg-primary/20 flex items-center justify-center">
-              <GitBranch className="h-7 w-7 text-primary" />
-            </div>
-            <h1 className="text-4xl font-bold tracking-tight">
-              Time<span className="text-primary">-</span>Thread
-            </h1>
-          </div>
+    <main className="loom-surface min-h-screen flex flex-col">
+      <header className="w-full max-w-6xl mx-auto px-6 md:px-10 pt-8 flex items-center gap-3">
+        <div className="h-9 w-9 rounded-lg bg-primary/20 flex items-center justify-center">
+          <GitBranch className="h-5 w-5 text-primary" />
+        </div>
+        <span className="font-display text-xl tracking-tight">
+          Time<span className="text-primary">-</span>Thread
+        </span>
+      </header>
 
-          {/* Tagline */}
-          <p className="text-xl text-muted-foreground max-w-2xl animate-fade-in [animation-delay:100ms]">
-            Transform long-form transcripts into interactive, branching visual
-            graphs. Map conversations through time.
+      <section className="flex-1 w-full max-w-6xl mx-auto px-6 md:px-10 py-14 grid lg:grid-cols-[1.15fr_1fr] items-center gap-12">
+        <div className="animate-fade-in">
+          <h1 className="text-5xl md:text-6xl leading-[1.06] text-foreground">
+            See where a conversation actually went.
+          </h1>
+          <p className="mt-6 max-w-lg text-lg leading-relaxed text-muted-foreground">
+            Paste a YouTube link and get a timeline of its main topics, side
+            roads and returns, synced to the video.
           </p>
-
-          {/* CTA */}
           <Link
             href="/dashboard"
-            className="group inline-flex items-center gap-2 bg-primary text-primary-foreground px-6 py-3 rounded-lg font-medium hover:bg-primary/90 transition-all animate-fade-in [animation-delay:200ms]"
+            className="group mt-9 inline-flex items-center gap-2 rounded-full bg-primary px-6 py-3 font-medium text-primary-foreground transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
           >
-            Open Dashboard
-            <ArrowRight className="h-4 w-4 group-hover:translate-x-1 transition-transform" />
+            Start weaving
+            <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
           </Link>
         </div>
 
-        {/* Feature Cards */}
-        <div className="grid md:grid-cols-3 gap-6 mt-24 max-w-4xl mx-auto">
-          <FeatureCard
-            icon={<FileText className="h-6 w-6" />}
-            title="Multi-Source Input"
-            description="Process YouTube videos, PDFs, and audio files into structured content."
-            delay="300ms"
-          />
-          <FeatureCard
-            icon={<GitBranch className="h-6 w-6" />}
-            title="Visual Branching"
-            description="See how topics branch and connect with an interactive graph."
-            delay="400ms"
-          />
-          <FeatureCard
-            icon={<Zap className="h-6 w-6" />}
-            title="AI-Powered"
-            description="Automatically identify topics, questions, and key insights."
-            delay="500ms"
-          />
-        </div>
-      </div>
+        <LoomThreads moving className="w-full" />
+      </section>
 
-      {/* Footer */}
-      <footer className="absolute bottom-0 w-full py-6 text-center text-sm text-muted-foreground">
-        <p>Built with Next.js, FastAPI, and React Flow</p>
-      </footer>
+      <ol className="w-full max-w-6xl mx-auto px-6 md:px-10 pb-14 grid md:grid-cols-3 gap-8">
+        {steps.map((step) => (
+          <li key={step.title}>
+            <div className={`h-0.5 w-12 rounded-full ${step.rule}`} />
+            <h2 className="mt-4 text-xl text-foreground">{step.title}</h2>
+            <p className="mt-1.5 text-sm leading-relaxed text-muted-foreground">
+              {step.description}
+            </p>
+          </li>
+        ))}
+      </ol>
     </main>
-  );
-}
-
-interface FeatureCardProps {
-  icon: React.ReactNode;
-  title: string;
-  description: string;
-  delay: string;
-}
-
-function FeatureCard({
-  icon,
-  title,
-  description,
-  delay,
-}: FeatureCardProps): JSX.Element {
-  return (
-    <div
-      className="group p-6 rounded-xl bg-card border border-border hover:border-primary/50 transition-colors animate-fade-in"
-      style={{ animationDelay: delay }}
-    >
-      <div className="h-12 w-12 rounded-lg bg-primary/10 flex items-center justify-center text-primary mb-4 group-hover:bg-primary/20 transition-colors">
-        {icon}
-      </div>
-      <h3 className="font-semibold text-lg mb-2">{title}</h3>
-      <p className="text-muted-foreground text-sm">{description}</p>
-    </div>
   );
 }

@@ -4,12 +4,18 @@ import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 
 /** Three silk threads crossing, used by the empty and waiting screens. */
-function LoomThreads({ moving }: { moving?: boolean }): JSX.Element {
+export function LoomThreads({
+  moving,
+  className = "w-60",
+}: {
+  moving?: boolean;
+  className?: string;
+}): JSX.Element {
   return (
     <svg
       viewBox="0 0 240 96"
       aria-hidden="true"
-      className={moving ? "loom-weave w-60" : "loom-weave--still w-60"}
+      className={`${moving ? "loom-weave" : "loom-weave--still"} ${className}`}
     >
       <path
         pathLength={300}
