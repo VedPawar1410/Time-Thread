@@ -1,7 +1,7 @@
 "use client";
 
-import { useCallback, useState, useEffect, Suspense } from "react";
-import { useSearchParams } from "next/navigation";
+import { useCallback, useRef, useState, useEffect, Suspense } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import {
   Crosshair,
   Play,
@@ -15,8 +15,8 @@ import { Sidebar } from "@/components/layout/sidebar";
 import {
   TimelineCanvas,
   demoGraphData,
-  parseTimestamp,
 } from "@/components/graph/timeline-canvas";
+import { EmptyState, WeavingState } from "@/components/graph/loom-states";
 import { VideoPlayer } from "@/components/video/video-player";
 import { useVideoSync } from "@/hooks/useVideoSync";
 import {
@@ -38,8 +38,13 @@ import { api, mapsApi } from "@/lib/api";
 import type { AIGraphResponse } from "@/types/graph";
 
 function DashboardContent(): JSX.Element {
+  const router = useRouter();
   const searchParams = useSearchParams();
   const mapId = searchParams.get("map");
+  const isSample = searchParams.get("sample") === "1";
+
+  // The map we just saved is already on screen, so don't reload it
+  const savedMapIdRef = useRef<string | null>(null);
 
   // Video sync hook
   const { playerRef, seekTo, handlers } = useVideoSync();
@@ -56,46 +61,71 @@ function DashboardContent(): JSX.Element {
   // Local state
   const [videoUrl, setVideoUrl] = useState("");
   const [inputUrl, setInputUrl] = useState("");
-  const [graphData, setGraphData] = useState<AIGraphResponse>(demoGraphData);
+  const [graphData, setGraphData] = useState<AIGraphResponse | null>(null);
   const [loading, setLoading] = useState(false);
+  const [processing, setProcessing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [warning, setWarning] = useState<string | null>(null);
   // Sidebar hidden on mobile by default
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [videoCollapsed, setVideoCollapsed] = useState(false);
 
-  // Load map from URL param
+  // The URL decides what's on screen: a saved map, the sample, or a blank start
   useEffect(() => {
-    if (mapId) {
-      loadMap(mapId);
+    setSidebarOpen(false);
+    if (mapId && mapId === savedMapIdRef.current) {
+      savedMapIdRef.current = null;
+      return;
     }
-  }, [mapId]);
 
-  const loadMap = async (id: string) => {
-    setLoading(true);
     setError(null);
     setWarning(null);
-    try {
-      const map = await mapsApi.getById(id);
-      setCurrentTime(0);
-      setIsPlaying(false);
-      setGraphData(map.graph_data);
-      if (map.video_url) {
-        setVideoUrl(map.video_url);
-        setInputUrl(map.video_url);
-      }
-    } catch (err) {
-      setError("Failed to load map");
-    } finally {
-      setLoading(false);
+    setCurrentTime(0);
+    setIsPlaying(false);
+    setGraphData(null);
+    setVideoUrl("");
+    setInputUrl("");
+
+    if (isSample) {
+      setGraphData(demoGraphData);
+      setWarning(
+        "This is a sample timeline. Paste a YouTube link to weave your own."
+      );
+      return;
     }
-  };
+    if (!mapId) return;
+
+    // Ignore this response if the user has already moved to another map
+    let isCurrent = true;
+    setLoading(true);
+    mapsApi
+      .getById(mapId)
+      .then((map) => {
+        if (!isCurrent) return;
+        setGraphData(map.graph_data);
+        if (map.video_url) {
+          setVideoUrl(map.video_url);
+          setInputUrl(map.video_url);
+        }
+      })
+      .catch(() => {
+        if (isCurrent) setError("This map could not be opened.");
+      })
+      .finally(() => {
+        if (isCurrent) setLoading(false);
+      });
+
+    return () => {
+      isCurrent = false;
+    };
+  }, [mapId, isSample, setCurrentTime, setIsPlaying]);
 
   // Handle processing a new video
   const handleProcess = async () => {
     if (!inputUrl.trim()) return;
 
     setLoading(true);
+    setProcessing(true);
     setError(null);
     setWarning(null);
 
@@ -111,13 +141,15 @@ function DashboardContent(): JSX.Element {
 
         // The graph is already on screen, so a failed save is only a warning
         try {
-          await mapsApi.create({
+          const saved = await mapsApi.create({
             name: `Video ${result.video_id ?? "Untitled"}`,
             video_id: result.video_id ?? undefined,
             video_url: inputUrl,
             graph_data: result.graph,
             raw_transcript: result.raw_transcript ?? undefined,
           });
+          savedMapIdRef.current = saved.id;
+          router.replace(`/dashboard?map=${saved.id}`);
           bumpMapsVersion();
         } catch (saveError) {
           console.error("Failed to save map:", saveError);
@@ -134,6 +166,7 @@ function DashboardContent(): JSX.Element {
       setError(err instanceof Error ? err.message : "Failed to process video");
     } finally {
       setLoading(false);
+      setProcessing(false);
     }
   };
 
@@ -144,6 +177,8 @@ function DashboardContent(): JSX.Element {
     },
     [seekTo]
   );
+
+  const nodes = graphData?.nodes ?? [];
 
   // Format seconds to MM:SS
   const formatTime = (seconds: number): string => {
@@ -218,19 +253,24 @@ function DashboardContent(): JSX.Element {
 
             <div className="ml-auto flex items-center gap-1 md:gap-3 flex-shrink-0">
               {/* Thread counts */}
-              <div className="hidden xl:flex items-center gap-4 text-xs text-muted-foreground mr-1">
+              <div
+                className={cn(
+                  "hidden items-center gap-4 text-xs text-muted-foreground mr-1",
+                  nodes.length > 0 && "xl:flex"
+                )}
+              >
                 <span className="flex items-center gap-1.5">
                   <span className="h-1.5 w-1.5 rounded-full bg-node-main" />
-                  {graphData.nodes.filter((n) => n.type === "main").length} main
+                  {nodes.filter((n) => n.type === "main").length} main
                 </span>
                 <span className="flex items-center gap-1.5">
                   <span className="h-1.5 w-1.5 rounded-full bg-node-subtopic" />
-                  {graphData.nodes.filter((n) => n.type === "subtopic").length}{" "}
+                  {nodes.filter((n) => n.type === "subtopic").length}{" "}
                   subtopics
                 </span>
                 <span className="flex items-center gap-1.5">
                   <span className="h-1.5 w-1.5 rounded-full bg-node-tangent" />
-                  {graphData.nodes.filter((n) => n.type === "tangent").length}{" "}
+                  {nodes.filter((n) => n.type === "tangent").length}{" "}
                   tangents
                 </span>
               </div>
@@ -353,39 +393,45 @@ function DashboardContent(): JSX.Element {
 
             {/* Graph Canvas */}
             <div className="flex-1 relative min-h-0">
-              {loading ? (
+              {processing ? (
+                <WeavingState />
+              ) : loading ? (
                 <div className="w-full h-full flex items-center justify-center">
-                  <div className="flex flex-col items-center gap-4">
-                    <Loader2 className="h-10 w-10 animate-spin text-primary" />
-                    <p className="text-sm text-muted-foreground">
-                      Analyzing transcript...
-                    </p>
-                  </div>
+                  <Loader2
+                    aria-label="Opening map"
+                    className="h-8 w-8 animate-spin text-primary"
+                  />
                 </div>
-              ) : (
+              ) : graphData ? (
                 <TimelineCanvas
                   graphData={graphData}
                   onSeekTo={handleSeekTo}
                   className="w-full h-full"
                 />
+              ) : (
+                <EmptyState
+                  onShowSample={() => router.push("/dashboard?sample=1")}
+                />
               )}
 
               {/* Legend - hidden on mobile */}
-              <div className="hidden md:flex absolute top-3 left-3 z-10 items-center gap-4 rounded-full border border-border bg-card px-4 py-1.5 text-xs text-muted-foreground pointer-events-none">
-                <span className="flex items-center gap-1.5">
-                  <span className="h-0.5 w-3 rounded-full bg-node-main" />
-                  Main topic
-                </span>
-                <span className="flex items-center gap-1.5">
-                  <span className="h-0.5 w-3 rounded-full bg-node-subtopic" />
-                  Subtopic
-                </span>
-                <span className="flex items-center gap-1.5">
-                  <span className="h-0.5 w-3 rounded-full bg-node-tangent" />
-                  Tangent
-                </span>
-                <span className="text-muted-foreground/70">Time flows down</span>
-              </div>
+              {graphData && !loading && (
+                <div className="hidden md:flex absolute top-3 left-3 z-10 items-center gap-4 rounded-full border border-border bg-card px-4 py-1.5 text-xs text-muted-foreground pointer-events-none">
+                  <span className="flex items-center gap-1.5">
+                    <span className="h-0.5 w-3 rounded-full bg-node-main" />
+                    Main topic
+                  </span>
+                  <span className="flex items-center gap-1.5">
+                    <span className="h-0.5 w-3 rounded-full bg-node-subtopic" />
+                    Subtopic
+                  </span>
+                  <span className="flex items-center gap-1.5">
+                    <span className="h-0.5 w-3 rounded-full bg-node-tangent" />
+                    Tangent
+                  </span>
+                  <span className="text-muted-foreground/70">Time flows down</span>
+                </div>
+              )}
             </div>
           </div>
         </main>

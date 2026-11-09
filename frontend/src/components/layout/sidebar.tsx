@@ -214,6 +214,7 @@ export function Sidebar(): JSX.Element {
                 <Button
                   variant="ghost"
                   size="icon"
+                  aria-label="Refresh saved maps"
                   className="h-5 w-5"
                   onClick={loadRecentMaps}
                 >
@@ -242,7 +243,7 @@ export function Sidebar(): JSX.Element {
                 <ScrollArea className="flex-1 [&>[data-radix-scroll-area-viewport]>div]:!block">
                   <ul className="space-y-1 px-2">
                     {recentMaps.map((map) => (
-                      <li key={map.id}>
+                      <li key={map.id} className="group relative">
                         {editingId === map.id ? (
                           <div className="flex items-center gap-2 px-2 py-2">
                             <FolderOpen className="h-4 w-4 flex-shrink-0 text-muted-foreground" />
@@ -266,37 +267,42 @@ export function Sidebar(): JSX.Element {
                             />
                           </div>
                         ) : (
-                          <Link
-                            href={`/dashboard?map=${map.id}`}
-                            className={cn(
-                              "group flex items-center gap-2 px-2 py-2 rounded-md text-sm transition-colors",
-                              currentMapId === map.id
-                                ? "bg-primary/10 text-primary"
-                                : "text-muted-foreground hover:text-foreground hover:bg-secondary"
-                            )}
-                          >
-                            <FolderOpen className="h-4 w-4 flex-shrink-0" />
-                            <div className="flex-1 min-w-0">
-                              <p className="truncate font-medium">{map.name}</p>
-                              <p className="text-xs text-muted-foreground/70">
-                                {formatRelativeTime(map.updated_at)}
-                              </p>
+                          <>
+                            <Link
+                              href={`/dashboard?map=${map.id}`}
+                              className={cn(
+                                "flex items-center gap-2 px-2 py-2 rounded-md text-sm transition-colors",
+                                currentMapId === map.id
+                                  ? "bg-primary/10 text-primary"
+                                  : "text-muted-foreground group-hover:text-foreground group-hover:bg-secondary"
+                              )}
+                            >
+                              <FolderOpen className="h-4 w-4 flex-shrink-0" />
+                              {/* Touch screens have no hover, so leave room for the icons */}
+                              <div className="flex-1 min-w-0 [@media(hover:none)]:pr-14">
+                                <p className="truncate font-medium">{map.name}</p>
+                                <p className="text-xs text-muted-foreground/70">
+                                  {formatRelativeTime(map.updated_at)}
+                                </p>
+                              </div>
+                            </Link>
+                            <div className="absolute right-1 top-1/2 -translate-y-1/2 flex items-center rounded-md bg-secondary opacity-0 transition-opacity group-hover:opacity-100 focus-within:opacity-100 [@media(hover:none)]:opacity-100">
+                              <button
+                                onClick={(e) => startEditing(map, e)}
+                                aria-label="Rename map"
+                                className="h-7 w-7 flex items-center justify-center rounded-md text-muted-foreground hover:text-primary transition-colors"
+                              >
+                                <Pencil className="h-3.5 w-3.5" />
+                              </button>
+                              <button
+                                onClick={(e) => handleDeleteMap(map.id, e)}
+                                aria-label="Delete map"
+                                className="h-7 w-7 flex items-center justify-center rounded-md text-muted-foreground hover:text-destructive transition-colors"
+                              >
+                                <Trash2 className="h-3.5 w-3.5" />
+                              </button>
                             </div>
-                            <button
-                              onClick={(e) => startEditing(map, e)}
-                              aria-label="Rename map"
-                              className="opacity-0 group-hover:opacity-100 focus-visible:opacity-100 p-1 hover:text-primary transition-opacity"
-                            >
-                              <Pencil className="h-3 w-3" />
-                            </button>
-                            <button
-                              onClick={(e) => handleDeleteMap(map.id, e)}
-                              aria-label="Delete map"
-                              className="opacity-0 group-hover:opacity-100 focus-visible:opacity-100 p-1 hover:text-red-400 transition-opacity"
-                            >
-                              <Trash2 className="h-3 w-3" />
-                            </button>
-                          </Link>
+                          </>
                         )}
                       </li>
                     ))}
