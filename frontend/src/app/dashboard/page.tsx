@@ -132,6 +132,12 @@ function DashboardContent(): JSX.Element {
     try {
       const result = await api.processTranscript(inputUrl);
 
+      // Already woven: open the saved map instead of creating a duplicate
+      if (result.map_id) {
+        router.push(`/dashboard?map=${result.map_id}`);
+        return;
+      }
+
       if (result.success && result.graph) {
         setWarning(result.warning);
         setCurrentTime(0);
@@ -142,7 +148,7 @@ function DashboardContent(): JSX.Element {
         // The graph is already on screen, so a failed save is only a warning
         try {
           const saved = await mapsApi.create({
-            name: `Video ${result.video_id ?? "Untitled"}`,
+            name: result.title ?? `Video ${result.video_id ?? "Untitled"}`,
             video_id: result.video_id ?? undefined,
             video_url: inputUrl,
             graph_data: result.graph,

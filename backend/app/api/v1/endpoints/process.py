@@ -1,9 +1,11 @@
 """Transcript processing endpoint for AI-powered graph generation."""
 
+import asyncio
 import logging
 
 from fastapi import APIRouter, Body, HTTPException, status
 
+from app.api.v1.endpoints.maps import find_map_by_video_id
 from app.models.graph import (
     AIGraphResponse,
     ProcessTranscriptRequest,
@@ -19,6 +21,8 @@ from app.services.transcription import (
     TranscriptBlockedError,
     TranscriptNotFoundError,
     YouTubeTranscriber,
+    extract_video_id,
+    fetch_video_title,
 )
 
 logger = logging.getLogger(__name__)
@@ -66,6 +70,28 @@ async def process_transcript(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="YouTube URL is required",
         )
+
+    try:
+        requested_video_id = extract_video_id(youtube_url)
+    except InvalidVideoURLError as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(e),
+        )
+
+    # A saved video costs nothing to reopen: no YouTube request, no Gemini quota
+    saved_map = await asyncio.to_thread(find_map_by_video_id, requested_video_id)
+    if saved_map:
+        return ProcessTranscriptResponse(
+            success=True,
+            message="This video was already processed",
+            map_id=saved_map.id,
+            video_id=requested_video_id,
+            title=saved_map.name,
+            graph=saved_map.graph_data,
+            raw_transcript=saved_map.raw_transcript,
+        )
+
     # Step 1: Fetch transcript from YouTube
     transcriber = YouTubeTranscriber()
 
@@ -135,7 +161,7 @@ async def process_transcript(
         message="Transcript processed successfully",
         warning=warning,
         video_id=video_id,
-        title=None,  # Could be fetched separately if needed
+        title=await fetch_video_title(video_id),
         graph=graph,
         raw_transcript=transcript_result.full_text,
     )

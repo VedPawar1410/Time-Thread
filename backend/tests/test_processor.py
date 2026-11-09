@@ -34,6 +34,14 @@ def test_parses_json_wrapped_in_code_fence():
     assert len(graph.nodes) == 1
 
 
+def test_parses_reply_split_into_parts():
+    reply = [{"type": "text", "text": VALID_REPLY[:20]}, VALID_REPLY[20:]]
+
+    graph = asyncio.run(processor_replying_with(reply).process_transcript("x"))
+
+    assert len(graph.nodes) == 1
+
+
 def test_invalid_json_raises_processing_error():
     with pytest.raises(AIProcessingError):
         asyncio.run(processor_replying_with("not json").process_transcript("x"))

@@ -135,6 +135,7 @@ export interface ProcessTranscriptResponse {
   success: boolean;
   message: string;
   warning: string | null;
+  map_id: string | null;
   video_id: string | null;
   title: string | null;
   graph: AIGraphResponse | null;

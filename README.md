@@ -62,7 +62,8 @@ There is no training dataset. Transcripts come from YouTube captions at request 
 | Deleted, private or age-restricted video | 500 | 404 with a clear message |
 | Shorts and `/live/` URLs | Rejected | Work |
 | Video with no English captions | Reported as no transcript | Uses the language available |
-| Transcript over 100,000 characters | Silently cut off | Cut off, with a visible warning |
+| Transcript over 100,000 characters | Silently cut off | Handled up to 300,000 (about 4 hours), then a visible warning |
+| Same video processed twice | Spent YouTube requests and Gemini quota again | Reopens the saved map in about 1 s, at no cost |
 | Public access to saved maps | Anyone could read, change or delete | No public-role access |
 | Failed save | Silent | Warning shown |
 | Runtime Python packages | 17 | 10 |
@@ -76,6 +77,7 @@ There is no training dataset. Transcripts come from YouTube captions at request 
 | Real 19-minute talk, in the browser | 11 nodes, about 50 s |
 | 8-line sample transcript, 3 runs | 5 nodes each, 8.8 to 10.4 s |
 | 107,589-character synthetic transcript | 19 nodes, 18 edges, 24 s |
+| 300,000-character synthetic transcript (4.1 hours), 2 runs | 10 and 41 nodes, graph reaches the end both times, 29 to 55 s |
 
 **Model check on 2026-11-09** (one-word prompt, REST)
 
@@ -227,7 +229,8 @@ Docker Compose reads its variables from a `.env` file in the repo root. The file
 
 - YouTube videos only. PDF and audio were planned but never built.
 - YouTube may block transcript requests; the app reports this as a 503.
-- Only the first 100,000 characters of a transcript are analyzed.
+- Only the first 300,000 characters of a transcript (about 4 hours) are analyzed.
+- The level of detail varies between runs: the same long transcript produced 10 nodes once and 41 another time.
 - Speakers are guessed from context, because YouTube captions don't label them.
 - Graph quality hasn't been evaluated, and timestamps from the model aren't validated.
 - No accounts: every map is visible to anyone who can reach the backend.
@@ -294,6 +297,10 @@ One rebuild mistake is worth recording: my CORS fix in 2.1 broke the JSON format
 | 3.6 | Labelled timed loading stages honestly | The server doesn't report progress. A real 19-minute talk took about 50 s, so I corrected my first "10 to 30 seconds" copy. |
 | 3.7 | Fixed the sidebar overflow at its cause | Radix's scroll area uses `display: table`, which ignores `truncate`. |
 | 3.8 | Added a `websockets` pin | Supabase's realtime package declares `>=11` but needs 13+, which broke an older virtual environment. |
+| 3.9 | Rejected reading whole videos with Gemini | Video costs far more tokens than a transcript, and this project has to stay on free tiers. |
+| 3.10 | Reused saved maps by video ID | A repeat request costs nothing, which matters most on free quotas. |
+| 3.11 | Raised the transcript limit to 300,000 characters and `max_output_tokens` to 32,768 | This reverses 2.9: at larger sizes the 8,192 limit cut the JSON off mid-reply. |
+| 3.12 | Accepted Gemini replies as a list of parts | A reply can arrive as a list instead of a string, which crashed parsing intermittently. |
 
 Two testing mistakes are worth recording. I reported that `npm run dev` loaded slowly, but the browser pane I was testing in was hidden and throttled. And one JSX comment in the wrong place broke the running app, right after I'd described the fix as done.
 
@@ -301,7 +308,7 @@ Two testing mistakes are worth recording. I reported that `npm run dev` loaded s
 
 1. **A passing build is not a working app.** Mine compiled while the video player couldn't load a video.
 2. **Test from a clean install.** That is what exposed the impossible dependencies and a leftover import.
-3. **Measure before you change things.** It ruled out the "smaller" Next.js patch and an output-token change I was sure about.
+3. **Measure before you change things, and measure at the extremes.** It ruled out the "smaller" Next.js patch, while a limit that looked fine at 19 nodes broke at larger sizes.
 4. **Newest isn't the same as working.** The latest listed model was the one that hung.
 5. **Isolate the layers when something hangs.** A plain `curl` showed which part was at fault in minutes.
 6. **Fail loudly.** Every silent success here hid a real bug.
@@ -313,7 +320,8 @@ Two testing mistakes are worth recording. I reported that `npm run dev` loaded s
 ## Future improvements
 
 **AI and graph quality**
-- Handle transcripts over 100,000 characters: split them into chunks and merge the graphs, or raise the limit, since a 107k-character run worked.
+- Handle transcripts over 300,000 characters: split them into chunks and merge the graphs.
+- Make the level of detail consistent, perhaps by asking for a node count based on video length.
 - Build an evaluation set of 10 to 30 real videos, measuring topics, timestamps, cost and latency.
 - Validate model output: timestamps within the video, start before end, no edges to missing nodes.
 - Improve speaker detection, for example with diarization.
@@ -321,9 +329,7 @@ Two testing mistakes are worth recording. I reported that `npm run dev` loaded s
 - Add a model fallback or startup check, since model availability changes.
 
 **Product**
-- Fetch real video titles, because maps are currently named "Video <id>".
 - Report real progress from the server while processing; the current stages are timed estimates.
-- Cache results by video ID to save quota and YouTube requests.
 - Save graph edits and node positions.
 - Add PDF, audio and long-document input.
 - From the original plan: searchable nodes, topic importance scoring, sentiment mapping, comparing speakers' perspectives, exportable maps.

@@ -21,10 +21,44 @@ class FakeProcessor:
         return AIGraphResponse(nodes=[], edges=[])
 
 
+async def fake_title(video_id):
+    return "A real title"
+
+
 @pytest.fixture
 def client(monkeypatch):
     monkeypatch.setattr(process_endpoint, "get_processor", lambda: FakeProcessor())
+    monkeypatch.setattr(process_endpoint, "find_map_by_video_id", lambda video_id: None)
+    monkeypatch.setattr(process_endpoint, "fetch_video_title", fake_title)
     return TestClient(app)
+
+
+def test_saved_video_is_reused_without_calling_youtube(client, monkeypatch):
+    def must_not_run(self, video_id):
+        raise AssertionError("YouTube should not be called for a saved video")
+
+    saved = SimpleNamespace(
+        id="saved-id",
+        name="Saved map",
+        graph_data=AIGraphResponse(nodes=[], edges=[]),
+        raw_transcript="[00:00] saved",
+    )
+    monkeypatch.setattr(YouTubeTranscriber, "_fetch_transcript_sync", must_not_run)
+    monkeypatch.setattr(process_endpoint, "find_map_by_video_id", lambda video_id: saved)
+
+    response = client.post("/api/v1/process-transcript", json=REQUEST)
+
+    assert response.status_code == 200
+    assert response.json()["map_id"] == "saved-id"
+
+
+def test_new_video_returns_its_title(client, monkeypatch):
+    fake_transcript(monkeypatch, [{"text": "hi", "start": 0.0, "duration": 1.0}])
+
+    response = client.post("/api/v1/process-transcript", json=REQUEST)
+
+    assert response.json()["title"] == "A real title"
+    assert response.json()["map_id"] is None
 
 
 def fake_transcript(monkeypatch, entries):
@@ -72,7 +106,7 @@ def test_invalid_url_returns_400(client):
 def test_long_transcript_returns_warning(client, monkeypatch):
     fake_transcript(
         monkeypatch,
-        [{"text": "a" * 300, "start": float(i), "duration": 1.0} for i in range(500)],
+        [{"text": "a" * 300, "start": float(i), "duration": 1.0} for i in range(1500)],
     )
 
     response = client.post("/api/v1/process-transcript", json=REQUEST)

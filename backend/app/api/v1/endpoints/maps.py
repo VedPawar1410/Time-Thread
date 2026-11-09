@@ -99,6 +99,25 @@ def database_error(action: str, error: Exception) -> HTTPException:
     )
 
 
+def find_map_by_video_id(video_id: str) -> MapRecord | None:
+    """Find the newest saved map for a video. A failed lookup returns None."""
+    try:
+        response = (
+            get_supabase()
+            .table("maps")
+            .select("*")
+            .eq("video_id", video_id)
+            .order("created_at", desc=True)
+            .limit(1)
+            .execute()
+        )
+    except Exception as e:
+        logger.warning(f"Could not check for a saved map of {video_id}: {e}")
+        return None
+
+    return MapRecord(**response.data[0]) if response.data else None
+
+
 def map_not_found(map_id: UUID) -> HTTPException:
     """Build the 404 response for a missing map."""
     return HTTPException(

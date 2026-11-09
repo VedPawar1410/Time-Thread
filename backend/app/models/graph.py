@@ -69,6 +69,7 @@ class ProcessTranscriptResponse(BaseModel):
     success: bool
     message: str
     warning: str | None = None
+    map_id: str | None = None  # Set when this video was already saved
     video_id: str | None = None
     title: str | None = None
     graph: AIGraphResponse | None = None

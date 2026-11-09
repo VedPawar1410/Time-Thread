@@ -15,8 +15,8 @@ from app.models.graph import AIGraphResponse, ProcessedEdge, ProcessedNode
 
 logger = logging.getLogger(__name__)
 
-# Longer transcripts are cut to this length (about 25k tokens)
-MAX_TRANSCRIPT_CHARS = 100_000
+# Longer transcripts are cut to this length (about 75k tokens, roughly 5 hours)
+MAX_TRANSCRIPT_CHARS = 300_000
 
 
 SYSTEM_PROMPT = """You are an expert conversation analyst. Your task is to analyze video transcripts and extract a structured conversation graph that shows the flow of topics, tangents, and how discussions connect.
@@ -111,7 +111,7 @@ class TranscriptProcessor:
             model=settings.gemini_model,
             google_api_key=settings.google_api_key,
             temperature=0.3,  # Lower temperature for more consistent structured output
-            max_output_tokens=8192,
+            max_output_tokens=32768,  # Long videos produce large graphs
             timeout=120,  # Fail with an error rather than hang on a stuck model
             max_retries=2,
             transport="rest",  # The default gRPC transport hangs on generate calls
@@ -163,11 +163,10 @@ Remember: Return ONLY the JSON object with "nodes" and "edges" arrays."""
             # ainvoke is broken with REST in this library version, so run the
             # sync call in a worker thread to keep the event loop free.
             response = await asyncio.to_thread(self.llm.invoke, messages)
-            response_text = response.content
-
-            # Clean up response if it contains markdown code blocks
-            if isinstance(response_text, str):
-                response_text = self._clean_json_response(response_text)
+            # Gemini can return one string or a list of text parts
+            response_text = self._clean_json_response(
+                self._content_as_text(response.content)
+            )
 
             # Parse JSON response
             try:
@@ -195,6 +194,15 @@ Remember: Return ONLY the JSON object with "nodes" and "edges" arrays."""
                 raise
             logger.exception("Unexpected error during transcript processing")
             raise AIProcessingError(f"Failed to process transcript: {str(e)}")
+
+    def _content_as_text(self, content: str | list[Any]) -> str:
+        """Join a model reply into one string, whichever shape it arrives in."""
+        if isinstance(content, str):
+            return content
+        return "".join(
+            part if isinstance(part, str) else part.get("text", "")
+            for part in content
+        )
 
     def _clean_json_response(self, text: str) -> str:
         """Remove markdown code blocks and clean up JSON response."""

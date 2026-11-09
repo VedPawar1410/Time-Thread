@@ -6,6 +6,7 @@ import re
 from typing import Any
 from xml.etree.ElementTree import ParseError as XMLParseError
 
+import httpx
 from pydantic import BaseModel
 from youtube_transcript_api import YouTubeTranscriptApi
 from youtube_transcript_api._errors import (
@@ -89,6 +90,24 @@ def extract_video_id(url_or_id: str) -> str:
         return match.group(1)
 
     raise InvalidVideoURLError(f"Could not extract video ID from: {url_or_id}")
+
+
+async def fetch_video_title(video_id: str) -> str | None:
+    """Get a video's title from YouTube's free oEmbed endpoint, if available."""
+    try:
+        async with httpx.AsyncClient(timeout=5) as client:
+            response = await client.get(
+                "https://www.youtube.com/oembed",
+                params={
+                    "url": f"https://www.youtube.com/watch?v={video_id}",
+                    "format": "json",
+                },
+            )
+            response.raise_for_status()
+            return response.json()["title"]
+    except (httpx.HTTPError, ValueError, KeyError) as e:
+        logger.warning(f"Could not fetch title for {video_id}: {e}")
+        return None
 
 
 def format_timestamp(seconds: float) -> str:
