@@ -9,7 +9,7 @@ Paste a YouTube URL and get an interactive timeline of the conversation: main to
 | Clean backend install | Fails (`ResolutionImpossible`) | Passes |
 | Real video to saved graph | Impossible | Works in the browser (5-node graph saved) |
 | Video playback and click-to-seek | Broken | Works |
-| Backend tests | 0 | 37 passing |
+| Backend tests | 0 | 48 passing |
 | Runtime npm vulnerabilities | 8 (1 critical) | 2 (0 critical) |
 | `/dashboard` first load | 252 kB | 203 kB |
 
@@ -66,7 +66,7 @@ There is no training dataset. Transcripts come from YouTube captions at request 
 | Same video processed twice | Spent YouTube requests and Gemini quota again | Reopens the saved map in about 1 s, at no cost |
 | Public access to saved maps | Anyone could read, change or delete | No public-role access |
 | Failed save | Silent | Warning shown |
-| Runtime Python packages | 17 | 10 |
+| Runtime Python packages | 17 | 11 |
 | Dead sidebar links | 3 | 0 |
 
 **Timing**
@@ -286,7 +286,7 @@ I built this in two layers: a fast first version, then a rebuild where I found o
 | 2.10 | Moved all database access to the backend | Removing the browser's access is simpler and safer than writing policies for it (1.6, 1.7). |
 | 2.11 | Upgraded the Supabase client | Version 2.3.4 rejected the new `sb_secret_` keys with `Invalid API key`. |
 | 2.12 | Removed about 1,300 lines of unused code | Stubs and unused routes were misleading (1.8, 1.9). |
-| 2.13 | Added 37 tests that fake only the outside services | They run in under a second and can't trigger a YouTube block (1.12). |
+| 2.13 | Added 37 tests that fake only the outside services (48 after later features) | They run in under a second and can't trigger a YouTube block (1.12). |
 | 2.14 | Stayed local-first | YouTube's IP blocks make a hosted version unreliable with this design. |
 
 One rebuild mistake is worth recording: my CORS fix in 2.1 broke the JSON format `docker-compose.yml` used, and I only caught it while reading that file for the cleanup. Now it uses the comma format, and a test covers that format.
