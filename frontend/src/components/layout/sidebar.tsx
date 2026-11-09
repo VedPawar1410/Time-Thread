@@ -238,7 +238,8 @@ export function Sidebar(): JSX.Element {
                   </p>
                 </div>
               ) : (
-                <ScrollArea className="flex-1">
+                // Radix wraps content in display:table, which ignores truncate
+                <ScrollArea className="flex-1 [&>[data-radix-scroll-area-viewport]>div]:!block">
                   <ul className="space-y-1 px-2">
                     {recentMaps.map((map) => (
                       <li key={map.id}>
