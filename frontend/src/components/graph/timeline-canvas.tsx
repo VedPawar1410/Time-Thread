@@ -51,8 +51,8 @@ const PIXELS_PER_MINUTE = 100;
 /** X-axis depth levels */
 const DEPTH_LEVELS = {
   MAIN: 0,        // Main topics at x = 0
-  SUBTOPIC: 200,  // Side questions/subtopics at x = 200
-  TANGENT: 400,   // Sub-tangents at x = 400
+  SUBTOPIC: 320,  // Subtopics at x = 320 (node width 260 + 60 gap)
+  TANGENT: 640,   // Tangents at x = 640
 } as const;
 
 /** Minimum vertical spacing between nodes to prevent overlap */

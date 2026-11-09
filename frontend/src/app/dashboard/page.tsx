@@ -310,6 +310,7 @@ function DashboardContent(): JSX.Element {
               >
                 <div className="relative w-full h-full p-2 md:p-4">
                   <VideoPlayer
+                    key={videoUrl}
                     ref={playerRef}
                     url={videoUrl}
                     playing={isPlaying}
@@ -361,11 +362,11 @@ function DashboardContent(): JSX.Element {
                 </div>
                 <div className="flex items-center gap-2">
                   <div className="w-3 h-0.5 bg-emerald-400" />
-                  <span className="text-white/70">X=200 : Subtopics</span>
+                  <span className="text-white/70">X=320 : Subtopics</span>
                 </div>
                 <div className="flex items-center gap-2">
                   <div className="w-3 h-0.5 bg-fuchsia-400" />
-                  <span className="text-white/70">X=400 : Tangents</span>
+                  <span className="text-white/70">X=640 : Tangents</span>
                 </div>
                 <div className="pt-1 border-t border-white/10 mt-2">
                   <span className="text-white/50">Y = Time (100px/min)</span>

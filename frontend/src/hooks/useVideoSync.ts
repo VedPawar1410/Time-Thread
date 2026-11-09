@@ -46,16 +46,22 @@ export function useVideoSync() {
    * Seek to a specific timestamp (e.g., from node click).
    * @param timestamp Time in seconds to seek to
    */
-  const seekTo = useCallback((timestamp: number) => {
-    if (playerRef.current) {
-      seekingRef.current = true;
-      playerRef.current.seekTo(timestamp, "seconds");
-      // Reset seeking flag after a short delay
-      setTimeout(() => {
-        seekingRef.current = false;
-      }, 100);
-    }
-  }, []);
+  const seekTo = useCallback(
+    (timestamp: number) => {
+      // Update the store first: a paused player sends no time updates, and the
+      // active node is derived from currentTime.
+      setCurrentTime(timestamp);
+      if (playerRef.current) {
+        seekingRef.current = true;
+        playerRef.current.seekTo(timestamp);
+        // Reset seeking flag after a short delay
+        setTimeout(() => {
+          seekingRef.current = false;
+        }, 100);
+      }
+    },
+    [setCurrentTime]
+  );
 
   /**
    * Handle play state change from player

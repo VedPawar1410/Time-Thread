@@ -1,43 +1,15 @@
 "use client";
 
 import { forwardRef, useState, useImperativeHandle, useRef } from "react";
-import type ReactPlayerClass from "react-player";
-import dynamic from "next/dynamic";
+import ReactPlayer from "react-player";
 import { Loader2, Youtube, AlertCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 // Type for ReactPlayer instance methods we need
 export interface ReactPlayerInstance {
-  seekTo: (amount: number, type?: "seconds" | "fraction") => void;
+  seekTo: (seconds: number) => void;
   getCurrentTime: () => number;
   getDuration: () => number;
-}
-
-// Dynamically import ReactPlayer to avoid SSR issues
-const ReactPlayer = dynamic(() => import("react-player"), {
-  ssr: false,
-  loading: () => (
-    <div className="w-full h-full flex items-center justify-center bg-black/50">
-      <Loader2 className="h-8 w-8 animate-spin text-amber-400" />
-    </div>
-  ),
-});
-
-interface ReactPlayerProps {
-  ref?: React.Ref<ReactPlayerInstance>;
-  url: string;
-  playing?: boolean;
-  controls?: boolean;
-  width?: string | number;
-  height?: string | number;
-  onProgress?: (state: { playedSeconds: number }) => void;
-  onDuration?: (duration: number) => void;
-  onPlay?: () => void;
-  onPause?: () => void;
-  onReady?: () => void;
-  onError?: () => void;
-  progressInterval?: number;
-  config?: Record<string, unknown>;
 }
 
 interface VideoPlayerProps {
@@ -68,15 +40,17 @@ export const VideoPlayer = forwardRef<ReactPlayerInstance, VideoPlayerProps>(
   ) {
     const [error, setError] = useState(false);
     const [ready, setReady] = useState(false);
-    const internalRef = useRef<ReactPlayerClass | null>(null);
+    // In react-player v3 the ref is a media element, like a <video> tag
+    const internalRef = useRef<HTMLVideoElement | null>(null);
 
-    // Expose the internal ref through the forwarded ref
     useImperativeHandle(ref, () => ({
-      seekTo: (amount: number, type?: "seconds" | "fraction") => {
-        internalRef.current?.seekTo(amount, type);
+      seekTo: (seconds: number) => {
+        if (internalRef.current) {
+          internalRef.current.currentTime = seconds;
+        }
       },
-      getCurrentTime: () => internalRef.current?.getCurrentTime?.() ?? 0,
-      getDuration: () => internalRef.current?.getDuration?.() ?? 0,
+      getCurrentTime: () => internalRef.current?.currentTime ?? 0,
+      getDuration: () => internalRef.current?.duration ?? 0,
     }));
 
     if (!url) {
@@ -128,29 +102,25 @@ export const VideoPlayer = forwardRef<ReactPlayerInstance, VideoPlayerProps>(
         )}
 
         <ReactPlayer
-          url={url}
+          ref={internalRef}
+          src={url}
           playing={playing}
           controls
           width="100%"
           height="100%"
-          onProgress={onProgress}
-          onDuration={onDuration}
+          onTimeUpdate={(e) =>
+            onProgress?.({ playedSeconds: e.currentTarget.currentTime })
+          }
+          onDurationChange={(e) => {
+            // onReady relies on loadstart, which YouTube can fire too early
+            // for the listener to catch, so treat a known duration as ready.
+            setReady(true);
+            onDuration?.(e.currentTarget.duration);
+          }}
           onPlay={onPlay}
           onPause={onPause}
-          onReady={(player) => {
-            internalRef.current = player;
-            setReady(true);
-          }}
           onError={() => setError(true)}
-          progressInterval={250}
-          config={{
-            youtube: {
-              playerVars: {
-                modestbranding: 1,
-                rel: 0,
-              },
-            },
-          }}
+          config={{ youtube: { rel: 0 } }}
         />
       </div>
     );
