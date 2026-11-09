@@ -2,6 +2,8 @@ import Link from "next/link";
 import { ArrowRight, GitBranch } from "lucide-react";
 import { LoomThreads } from "@/components/graph/loom-states";
 
+const READ_ONLY = process.env.NEXT_PUBLIC_READ_ONLY === "true";
+
 const steps = [
   {
     title: "Paste a link",
@@ -45,9 +47,16 @@ export default function HomePage(): JSX.Element {
             href="/dashboard"
             className="group mt-9 inline-flex items-center gap-2 rounded-full bg-primary px-6 py-3 font-medium text-primary-foreground transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
           >
-            Start weaving
+            {READ_ONLY ? "Explore timelines" : "Start weaving"}
             <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
           </Link>
+          {READ_ONLY && (
+            <p className="mt-5 max-w-lg text-xs leading-relaxed text-muted-foreground">
+              This live demo shows timelines already woven. YouTube blocks
+              transcript requests from cloud servers, so new videos are
+              processed locally.
+            </p>
+          )}
         </div>
 
         <LoomThreads moving className="w-full" />

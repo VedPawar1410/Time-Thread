@@ -1,7 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { Button } from "@/components/ui/button";
+import { mapsApi, type MapSummary } from "@/lib/api";
 
 /** Three silk threads crossing, used by the empty and waiting screens. */
 export function LoomThreads({
@@ -53,6 +55,68 @@ export function EmptyState({
           side roads, and the way back.
         </p>
       </div>
+      <Button variant="outline" className="rounded-full" onClick={onShowSample}>
+        See a sample
+      </Button>
+    </div>
+  );
+}
+
+/** Empty screen for the public demo, where new videos can't be processed. */
+export function ShowcaseState({
+  onShowSample,
+}: {
+  onShowSample: () => void;
+}): JSX.Element {
+  const [maps, setMaps] = useState<MapSummary[] | null>(null);
+  const [failed, setFailed] = useState(false);
+
+  useEffect(() => {
+    mapsApi
+      .getRecent(6)
+      .then(setMaps)
+      .catch(() => setFailed(true));
+  }, []);
+
+  return (
+    <div className="min-h-full flex flex-col items-center justify-center gap-6 px-6 py-10 text-center animate-fade-in">
+      <LoomThreads />
+      <div className="max-w-md">
+        <h2 className="text-3xl leading-tight text-foreground">
+          Follow a conversation.
+        </h2>
+        <p className="mt-3 text-sm leading-relaxed text-muted-foreground">
+          This live demo shows timelines that have already been woven. Pick one
+          to explore it alongside the video.
+        </p>
+      </div>
+
+      {maps && maps.length > 0 && (
+        <ul className="w-full max-w-sm space-y-2">
+          {maps.map((map) => (
+            <li key={map.id}>
+              <Link
+                href={`/dashboard?map=${map.id}`}
+                className="block truncate rounded-xl border border-border bg-card/70 px-4 py-3 text-sm text-foreground transition-colors hover:border-primary/50"
+              >
+                {map.name}
+              </Link>
+            </li>
+          ))}
+        </ul>
+      )}
+
+      {!maps && !failed && (
+        <p aria-live="polite" className="text-xs text-muted-foreground">
+          Waking the server. The first visit can take a minute.
+        </p>
+      )}
+      {failed && (
+        <p role="alert" className="text-xs text-destructive">
+          The demo server couldn&apos;t be reached. Please try again in a minute.
+        </p>
+      )}
+
       <Button variant="outline" className="rounded-full" onClick={onShowSample}>
         See a sample
       </Button>

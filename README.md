@@ -2,7 +2,7 @@
 
 Paste a YouTube URL and get an interactive timeline of the conversation: main topics, subtopics and tangents as a branching graph, synced to the video.
 
-**Live demo:** not deployed. It runs locally; see [Deployment](#deployment) for why.
+**Live demo:** https://time-thread.vercel.app shows saved timelines. New videos are processed locally; see [Deployment](#deployment) for why.
 
 | Measure | Before the rebuild | After |
 |---|---|---|
@@ -213,27 +213,37 @@ The tests replace YouTube, Gemini and Supabase with fakes, so they need no keys 
 
 ## Deployment
 
-Not deployed, on purpose. YouTube blocks transcript requests from most cloud IPs, and it blocked a home IP after about three quick requests, so a hosted version wouldn't work reliably with the current transcript fetching.
+Live at https://time-thread.vercel.app (frontend, Vercel) and https://time-thread-api.onrender.com (backend, Render), both on free tiers.
 
-If this is deployed later:
+**The live site is a showcase of saved timelines.** A real request from Render came back blocked by YouTube, which refuses transcript requests from most cloud servers. New videos are processed from a home connection, and both versions share one database, so they appear on the live site straight away. YouTube can also block a home connection after a few quick requests.
 
-- **Intended platforms:** Vercel for the frontend, Render for the backend.
-- **Render:** build with `pip install -r requirements.txt`, start with `uvicorn app.main:app --host 0.0.0.0 --port $PORT`, Python 3.11.
-- **Backend environment:** `GOOGLE_API_KEY`, `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, and `CORS_ORIGINS` as a comma-separated list.
-- **Vercel:** set `NEXT_PUBLIC_API_URL`, and first fix `frontend/vercel.json`, which still has a placeholder backend URL and old environment references.
-- **Add first:** authentication and rate limiting. Without them, anyone could spend the Gemini quota and change saved maps.
+**Setup**
+
+- **Render:** Blueprint at `backend/render.yaml`, with `GOOGLE_API_KEY`, `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, and `CORS_ORIGINS` set to the exact frontend URL.
+- **Vercel:** root directory `frontend`, with `NEXT_PUBLIC_API_URL` set to the Render URL and `NEXT_PUBLIC_READ_ONLY=true`.
+- **Safeguards on the public site:** visitors can't create, rename or delete maps (`READ_ONLY_MAPS`), and AI requests are capped per day (`DAILY_PROCESS_LIMIT`).
+
+**Options weighed for processing new videos in the cloud**
+
+| Option | Why it wasn't used |
+|---|---|
+| Have Gemini watch the video directly | Far more tokens than a transcript; the project has to stay free |
+| Residential proxy or hosted transcript service | Monthly cost |
+| Ask users to paste a transcript | Defeats the point of a one-link tool |
+
+**Free-tier behaviour:** Render sleeps after about 15 idle minutes, so the first visit can take around a minute. Supabase pauses free projects after a period of inactivity.
 
 Docker Compose reads its variables from a `.env` file in the repo root. The file passes validation, but a full Docker build has not been run.
 
 ## Limitations
 
 - YouTube videos only. PDF and audio were planned but never built.
-- YouTube may block transcript requests; the app reports this as a 503.
+- The live site can't process new videos, because YouTube blocks its cloud server. Locally, YouTube can still block after a few quick requests; the app reports this as a 503.
 - Only the first 300,000 characters of a transcript (about 4 hours) are analyzed.
 - The level of detail varies between runs: the same long transcript produced 10 nodes once and 41 another time.
 - Speakers are guessed from context, because YouTube captions don't label them.
 - Graph quality hasn't been evaluated, and timestamps from the model aren't validated.
-- No accounts: every map is visible to anyone who can reach the backend.
+- No accounts: every saved map is public on the live site.
 - Two npm audit findings remain, both from PostCSS bundled in Next.js. They need an attacker-controlled stylesheet at build time, and this app processes none. The fix is Next.js 16.
 ## Learning log: mistakes and what I learned
 
@@ -301,6 +311,8 @@ One rebuild mistake is worth recording: my CORS fix in 2.1 broke the JSON format
 | 3.10 | Reused saved maps by video ID | A repeat request costs nothing, which matters most on free quotas. |
 | 3.11 | Raised the transcript limit to 300,000 characters and `max_output_tokens` to 32,768 | This reverses 2.9: at larger sizes the 8,192 limit cut the JSON off mid-reply. |
 | 3.12 | Accepted Gemini replies as a list of parts | A reply can arrive as a list instead of a string, which crashed parsing intermittently. |
+| 3.13 | Moved saving to the server and added a read-only mode and a daily cap | Before going public, anyone could have written to the database or spent the free AI quota. |
+| 3.14 | Tested YouTube from the real host, then made the live site a showcase | A real request from Render was blocked. An honest showcase beats a link box that can only fail. |
 
 Two testing mistakes are worth recording. I reported that `npm run dev` loaded slowly, but the browser pane I was testing in was hidden and throttled. And one JSX comment in the wrong place broke the running app, right after I'd described the fix as done.
 
@@ -336,10 +348,9 @@ Two testing mistakes are worth recording. I reported that `npm run dev` loaded s
 - Build proper pages for import, history and settings.
 
 **Deployment and reliability**
-- Have Gemini read the YouTube URL directly, removing the transcript fetch that YouTube blocks. Timestamp accuracy needs testing first.
-- Otherwise, use a residential proxy (the library supports one), or throttle and cache requests.
-- Add authentication, per-user maps and rate limiting before going public.
-- Fix `vercel.json`, deploy, and plan for free-tier cold starts.
+- Allow new videos on the live site if a free way around YouTube's cloud blocking appears.
+- Add authentication and per-user maps so visitors can have their own timelines.
+- Reduce free-tier cold starts, which can make the first visit take about a minute.
 
 **Technical debt**
 - Upgrade or replace LangChain and remove the REST and worker-thread workaround.

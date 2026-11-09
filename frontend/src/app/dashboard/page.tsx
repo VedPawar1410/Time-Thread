@@ -16,7 +16,11 @@ import {
   TimelineCanvas,
   demoGraphData,
 } from "@/components/graph/timeline-canvas";
-import { EmptyState, WeavingState } from "@/components/graph/loom-states";
+import {
+  EmptyState,
+  ShowcaseState,
+  WeavingState,
+} from "@/components/graph/loom-states";
 import { VideoPlayer } from "@/components/video/video-player";
 import { useVideoSync } from "@/hooks/useVideoSync";
 import {
@@ -36,6 +40,8 @@ import {
 import { cn } from "@/lib/utils";
 import { api, mapsApi } from "@/lib/api";
 import type { AIGraphResponse } from "@/types/graph";
+
+const READ_ONLY = process.env.NEXT_PUBLIC_READ_ONLY === "true";
 
 function DashboardContent(): JSX.Element {
   const router = useRouter();
@@ -89,7 +95,9 @@ function DashboardContent(): JSX.Element {
     if (isSample) {
       setGraphData(demoGraphData);
       setWarning(
-        "This is a sample timeline. Paste a YouTube link to weave your own."
+        READ_ONLY
+          ? "This is a sample timeline."
+          : "This is a sample timeline. Paste a YouTube link to weave your own."
       );
       return;
     }
@@ -216,26 +224,32 @@ function DashboardContent(): JSX.Element {
             </Button>
 
             {/* The main action: weave a video into a timeline */}
-            <div className="relative flex-1 min-w-0 max-w-2xl">
-              <Youtube className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
-              <Input
-                aria-label="YouTube link"
-                value={inputUrl}
-                onChange={(e) => setInputUrl(e.target.value)}
-                placeholder="Paste a YouTube link"
-                className="h-10 rounded-full bg-background/70 pl-10 pr-24 text-sm focus-visible:ring-offset-0"
-                onKeyDown={(e) => e.key === "Enter" && handleProcess()}
-              />
-              <Button
-                size="sm"
-                onClick={handleProcess}
-                disabled={loading || !inputUrl.trim()}
-                className="absolute right-1 top-1 h-8 rounded-full px-4 gap-1.5"
-              >
-                {loading && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
-                Weave
-              </Button>
-            </div>
+            {READ_ONLY ? (
+              <p className="flex-1 min-w-0 truncate text-sm text-muted-foreground">
+                Live demo: saved timelines
+              </p>
+            ) : (
+              <div className="relative flex-1 min-w-0 max-w-2xl">
+                <Youtube className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
+                <Input
+                  aria-label="YouTube link"
+                  value={inputUrl}
+                  onChange={(e) => setInputUrl(e.target.value)}
+                  placeholder="Paste a YouTube link"
+                  className="h-10 rounded-full bg-background/70 pl-10 pr-24 text-sm focus-visible:ring-offset-0"
+                  onKeyDown={(e) => e.key === "Enter" && handleProcess()}
+                />
+                <Button
+                  size="sm"
+                  onClick={handleProcess}
+                  disabled={loading || !inputUrl.trim()}
+                  className="absolute right-1 top-1 h-8 rounded-full px-4 gap-1.5"
+                >
+                  {loading && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+                  Weave
+                </Button>
+              </div>
+            )}
 
             <div className="ml-auto flex items-center gap-1 md:gap-3 flex-shrink-0">
               {/* Thread counts */}
@@ -394,6 +408,12 @@ function DashboardContent(): JSX.Element {
                   onSeekTo={handleSeekTo}
                   className="w-full h-full"
                 />
+              ) : READ_ONLY ? (
+                <div className="h-full overflow-y-auto">
+                  <ShowcaseState
+                    onShowSample={() => router.push("/dashboard?sample=1")}
+                  />
+                </div>
               ) : (
                 <EmptyState
                   onShowSample={() => router.push("/dashboard?sample=1")}
