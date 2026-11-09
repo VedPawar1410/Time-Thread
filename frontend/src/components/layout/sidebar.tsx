@@ -6,9 +6,7 @@ import { useSearchParams } from "next/navigation";
 import {
   GitBranch,
   Home,
-  Upload,
   History,
-  Settings,
   ChevronLeft,
   ChevronRight,
   Plus,
@@ -50,16 +48,6 @@ const mainNavItems: SidebarItem[] = [
     label: "Dashboard",
     href: "/dashboard",
     active: true,
-  },
-  { icon: <Upload className="h-5 w-5" />, label: "Import", href: "/import" },
-  { icon: <History className="h-5 w-5" />, label: "History", href: "/history" },
-];
-
-const bottomNavItems: SidebarItem[] = [
-  {
-    icon: <Settings className="h-5 w-5" />,
-    label: "Settings",
-    href: "/settings",
   },
 ];
 
@@ -248,19 +236,6 @@ export function Sidebar(): JSX.Element {
               )}
             </div>
           )}
-        </nav>
-
-        <Separator />
-
-        {/* Bottom Navigation */}
-        <nav className="p-2 flex-shrink-0">
-          <ul className="space-y-1">
-            {bottomNavItems.map((item) => (
-              <li key={item.href}>
-                <NavItem item={item} collapsed={collapsed} />
-              </li>
-            ))}
-          </ul>
         </nav>
 
         {/* Collapse Toggle */}

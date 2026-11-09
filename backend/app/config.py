@@ -27,11 +27,7 @@ class Settings(BaseSettings):
 
     # Supabase
     supabase_url: str = ""
-    supabase_anon_key: str = ""
     supabase_service_role_key: str = ""
-
-    # OpenAI (for future AI processing)
-    openai_api_key: str = ""
 
     # Google Gemini
     google_api_key: str = ""

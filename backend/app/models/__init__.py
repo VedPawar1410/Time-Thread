@@ -1,21 +1,17 @@
 """Pydantic models for API request/response validation."""
 
 from app.models.graph import (
-    Edge,
-    EdgeType,
-    Graph,
-    GraphCreate,
-    GraphResponse,
-    Node,
-    NodeType,
+    AIGraphResponse,
+    ProcessedEdge,
+    ProcessedNode,
+    ProcessTranscriptRequest,
+    ProcessTranscriptResponse,
 )
 
 __all__ = [
-    "Node",
-    "NodeType",
-    "Edge",
-    "EdgeType",
-    "Graph",
-    "GraphCreate",
-    "GraphResponse",
+    "AIGraphResponse",
+    "ProcessedEdge",
+    "ProcessedNode",
+    "ProcessTranscriptRequest",
+    "ProcessTranscriptResponse",
 ]

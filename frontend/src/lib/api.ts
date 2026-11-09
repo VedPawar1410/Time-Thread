@@ -97,37 +97,4 @@ export const api = {
 
     return response.json();
   },
-
-  /**
-   * Analyze raw transcript text
-   */
-  async analyzeTranscript(transcript: string): Promise<AIGraphResponse> {
-    const response = await fetch(`${API_BASE_URL}/api/v1/analyze`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(transcript),
-    });
-
-    if (!response.ok) {
-      const error = await response.json().catch(() => ({ detail: "Unknown error" }));
-      throw new Error(error.detail ?? `HTTP ${response.status}`);
-    }
-
-    return response.json();
-  },
-
-  /**
-   * Health check
-   */
-  async healthCheck(): Promise<{ status: string; version: string }> {
-    const response = await fetch(`${API_BASE_URL}/health`);
-
-    if (!response.ok) {
-      throw new Error(`API health check failed: HTTP ${response.status}`);
-    }
-
-    return response.json();
-  },
 };
