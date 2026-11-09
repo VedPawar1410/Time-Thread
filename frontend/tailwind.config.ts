@@ -43,21 +43,10 @@ const config: Config = {
         border: "hsl(var(--border))",
         input: "hsl(var(--input))",
         ring: "hsl(var(--ring))",
-        chart: {
-          "1": "hsl(var(--chart-1))",
-          "2": "hsl(var(--chart-2))",
-          "3": "hsl(var(--chart-3))",
-          "4": "hsl(var(--chart-4))",
-          "5": "hsl(var(--chart-5))",
-        },
-        // Custom node colors for the graph
+        // Thread colors for the graph
         node: {
-          topic: "hsl(var(--node-topic))",
-          subtopic: "hsl(var(--node-subtopic))",
-          question: "hsl(var(--node-question))",
-          answer: "hsl(var(--node-answer))",
-          insight: "hsl(var(--node-insight))",
           main: "hsl(var(--node-main))",
+          subtopic: "hsl(var(--node-subtopic))",
           tangent: "hsl(var(--node-tangent))",
         },
       },

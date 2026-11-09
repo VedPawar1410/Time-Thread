@@ -3,16 +3,12 @@
 import { useCallback, useMemo, useEffect, useRef } from "react";
 import {
   ReactFlow,
-  Background,
   Controls,
   MiniMap,
   useNodesState,
   useEdgesState,
   useReactFlow,
   ReactFlowProvider,
-  BackgroundVariant,
-  SmoothStepEdge,
-  BezierEdge,
   type Node,
   type Edge,
   type NodeMouseHandler,
@@ -26,6 +22,7 @@ import {
   selectCurrentTime,
   selectActiveNodeId,
   selectFollowMode,
+  selectIsPlaying,
 } from "@/stores/timeline-store";
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -56,10 +53,15 @@ const DEPTH_LEVELS = {
 } as const;
 
 /** Minimum vertical spacing between nodes to prevent overlap */
-const MIN_NODE_SPACING = 140;
+const MIN_NODE_SPACING = 168;
 
 /** Node width for layout calculations */
 const NODE_WIDTH = 260;
+
+/** Opening view: fit the graph's width, but never shrink cards past readable */
+const MIN_READABLE_ZOOM = 0.55;
+const VIEW_PADDING = 24;
+const VIEW_TOP = 72;
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Node & Edge Type Configuration
@@ -71,11 +73,6 @@ const nodeTypes = {
   subtopic: TopicNode,
   tangent: TopicNode,
   topic: TopicNode,
-} as const;
-
-const edgeTypes = {
-  smoothstep: SmoothStepEdge,
-  default: BezierEdge,
 } as const;
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -163,6 +160,7 @@ function convertToFlowNode(
       endTime: node.end_time,
       nodeType: node.type,
       timestampSeconds: startSeconds,
+      revealIndex: index,
     },
   };
 }
@@ -171,41 +169,22 @@ function convertToFlowNode(
  * Convert backend ProcessedEdge to React Flow Edge
  */
 function convertToFlowEdge(edge: ProcessedEdge, nodes: ProcessedNode[]): Edge {
-  const sourceNode = nodes.find((n) => n.id === edge.source);
-  const targetNode = nodes.find((n) => n.id === edge.target);
-  const isTangentEdge =
-    sourceNode?.type === "tangent" ||
-    targetNode?.type === "tangent" ||
-    edge.label === "tangent" ||
-    edge.label === "interruption";
+  const findType = (id: string) => nodes.find((n) => n.id === id)?.type;
+  const isReturn = edge.label === "return_to_topic";
 
-  const isReturnEdge = edge.label === "return_to_topic";
+  // A thread takes the colour of what it leads to; a return keeps its origin's
+  const type = findType(isReturn ? edge.source : edge.target);
+  const thread = type === "subtopic" || type === "tangent" ? type : "main";
+  const baseClass = `loom-thread loom-thread--${thread}${
+    isReturn ? " loom-thread--return" : ""
+  }`;
 
   return {
     id: `edge-${edge.source}-${edge.target}`,
     source: edge.source,
     target: edge.target,
-    type: isTangentEdge || isReturnEdge ? "default" : "smoothstep",
-    animated: isTangentEdge,
-    style: {
-      stroke: isTangentEdge
-        ? "rgba(217, 70, 239, 0.6)"
-        : isReturnEdge
-        ? "rgba(156, 163, 175, 0.5)"
-        : "rgba(251, 191, 36, 0.5)",
-      strokeWidth: isTangentEdge ? 2 : 2.5,
-      strokeDasharray: isReturnEdge ? "5,5" : undefined,
-    },
-    label: isReturnEdge ? "↩ return" : undefined,
-    labelStyle: {
-      fill: "rgba(255, 255, 255, 0.6)",
-      fontSize: 10,
-      fontWeight: 500,
-    },
-    labelBgStyle: {
-      fill: "rgba(0, 0, 0, 0.6)",
-      fillOpacity: 0.8,
-    },
+    className: baseClass,
+    data: { baseClass },
   };
 }
 
@@ -238,12 +217,14 @@ function TimelineCanvasInner({
   onSeekTo,
   className,
 }: TimelineCanvasProps): JSX.Element {
-  const { setCenter, getNode } = useReactFlow();
+  const { getNode, getViewport, setViewport } = useReactFlow();
+  const containerRef = useRef<HTMLDivElement>(null);
 
   // Zustand store
   const currentTime = useTimelineStore(selectCurrentTime);
   const activeNodeId = useTimelineStore(selectActiveNodeId);
   const followMode = useTimelineStore(selectFollowMode);
+  const isPlaying = useTimelineStore(selectIsPlaying);
   const setActiveNodeId = useTimelineStore((s) => s.setActiveNodeId);
 
   // Track last centered node to avoid redundant pans
@@ -269,7 +250,61 @@ function TimelineCanvasInner({
   }, [graphData]);
 
   const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
-  const [edges, , onEdgesChange] = useEdgesState(initialEdges);
+  const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
+
+  const nodeTimes = useMemo(
+    () =>
+      new Map(
+        initialNodes.map((node) => [
+          node.id,
+          (node.data as TopicNodeData).timestampSeconds ?? 0,
+        ])
+      ),
+    [initialNodes]
+  );
+
+  // Light the threads already travelled. Runs only when the topic changes,
+  // not on every time update, so long videos stay smooth.
+  useEffect(() => {
+    const activeTime = activeNodeId ? nodeTimes.get(activeNodeId) ?? -1 : -1;
+
+    setEdges((current) =>
+      current.map((edge) => {
+        const played =
+          (nodeTimes.get(edge.source) ?? Infinity) <= activeTime &&
+          (nodeTimes.get(edge.target) ?? Infinity) <= activeTime;
+        const live = isPlaying && edge.target === activeNodeId;
+        const className = [
+          edge.data?.baseClass,
+          played && "loom-thread--played",
+          live && "loom-thread--live",
+        ]
+          .filter(Boolean)
+          .join(" ");
+
+        return className === edge.className ? edge : { ...edge, className };
+      })
+    );
+  }, [activeNodeId, isPlaying, nodeTimes, setEdges]);
+
+  // Open at a readable size, starting from the top of the timeline
+  const applyInitialView = useCallback(() => {
+    const pane = containerRef.current?.getBoundingClientRect();
+    if (!pane || initialNodes.length === 0) return;
+
+    const graphWidth =
+      Math.max(...initialNodes.map((node) => node.position.x)) + NODE_WIDTH;
+    const zoom = Math.min(
+      1,
+      Math.max(MIN_READABLE_ZOOM, (pane.width - VIEW_PADDING * 2) / graphWidth)
+    );
+
+    setViewport({
+      x: Math.max(VIEW_PADDING, (pane.width - graphWidth * zoom) / 2),
+      y: VIEW_TOP,
+      zoom,
+    });
+  }, [initialNodes, setViewport]);
 
   // Update active node based on current time
   useEffect(() => {
@@ -281,18 +316,27 @@ function TimelineCanvasInner({
 
   // Auto-center on active node (Follow Mode)
   useEffect(() => {
-    if (!followMode || !activeNodeId) return;
+    // Leave the opening view alone until playback or a click moves the time
+    if (!followMode || !activeNodeId || currentTime === 0) return;
     if (lastCenteredNodeRef.current === activeNodeId) return;
 
     const node = getNode(activeNodeId);
-    if (node) {
-      const x = node.position.x + NODE_WIDTH / 2;
-      const y = node.position.y + 70; // Center on node middle
+    const pane = containerRef.current?.getBoundingClientRect();
+    if (node && pane) {
+      const { x, zoom } = getViewport();
+      const left = x + node.position.x * zoom;
+      const isOffScreen = left < 0 || left + NODE_WIDTH * zoom > pane.width;
 
-      setCenter(x, y, { zoom: 1, duration: 600 });
+      // Time flows down, so only scroll sideways if the card is out of view
+      const nextX = isOffScreen
+        ? pane.width / 2 - (node.position.x + NODE_WIDTH / 2) * zoom
+        : x;
+      const nextY = pane.height / 2 - (node.position.y + 70) * zoom;
+
+      setViewport({ x: nextX, y: nextY, zoom }, { duration: 600 });
       lastCenteredNodeRef.current = activeNodeId;
     }
-  }, [activeNodeId, followMode, setCenter, getNode]);
+  }, [activeNodeId, currentTime, followMode, getNode, getViewport, setViewport]);
 
   // Update node selection state based on activeNodeId
   useEffect(() => {
@@ -320,37 +364,22 @@ function TimelineCanvasInner({
   // MiniMap node colors
   const getNodeColor = useCallback((node: Node) => {
     const colors: Record<string, string> = {
-      main: "#fbbf24",
-      subtopic: "#34d399",
-      tangent: "#d946ef",
-      topic: "#fbbf24",
+      subtopic: "hsl(var(--node-subtopic))",
+      tangent: "hsl(var(--node-tangent))",
     };
-    return colors[node.type ?? "main"] ?? "#fbbf24";
+    return colors[node.type ?? "main"] ?? "hsl(var(--node-main))";
   }, []);
 
-  const defaultEdgeOptions = useMemo(
-    () => ({
-      style: {
-        stroke: "rgba(251, 191, 36, 0.4)",
-        strokeWidth: 2,
-      },
-    }),
-    []
-  );
-
   return (
-    <div className={className ?? "w-full h-full bg-background"}>
+    <div ref={containerRef} className={className ?? "w-full h-full"}>
       <ReactFlow
         nodes={nodes}
         edges={edges}
         onNodesChange={onNodesChange}
         onEdgesChange={onEdgesChange}
         onNodeClick={handleNodeClick}
+        onInit={applyInitialView}
         nodeTypes={nodeTypes}
-        edgeTypes={edgeTypes}
-        defaultEdgeOptions={defaultEdgeOptions}
-        fitView
-        fitViewOptions={{ padding: 0.4 }}
         minZoom={0.1}
         maxZoom={2}
         proOptions={{ hideAttribution: true }}
@@ -358,27 +387,17 @@ function TimelineCanvasInner({
         nodesConnectable={false}
         elementsSelectable={true}
       >
-        <Background
-          variant={BackgroundVariant.Dots}
-          gap={24}
-          size={1.5}
-          color="rgba(255, 255, 255, 0.08)"
-        />
-
-        <Controls
-          showZoom
-          showFitView
-          showInteractive={false}
-          className="!bg-black/40 !backdrop-blur-xl !border !border-white/10 !rounded-xl !shadow-2xl"
-        />
+        <Controls showZoom showFitView showInteractive={false} />
 
         <MiniMap
           nodeColor={getNodeColor}
-          maskColor="rgba(0, 0, 0, 0.85)"
-          className="!bg-black/40 !backdrop-blur-xl !rounded-xl !border !border-white/10"
+          bgColor="hsl(228 32% 10%)"
+          maskColor="hsl(228 38% 7% / 0.72)"
+          className="max-md:!hidden !rounded-xl overflow-hidden !border !border-border"
+          style={{ width: 160, height: 112 }}
           pannable
           zoomable
-          nodeStrokeWidth={3}
+          nodeBorderRadius={6}
         />
       </ReactFlow>
     </div>

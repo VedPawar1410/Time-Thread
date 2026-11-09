@@ -51,6 +51,7 @@ function DashboardContent(): JSX.Element {
   const setIsPlaying = useTimelineStore((s) => s.setIsPlaying);
   const toggleFollowMode = useTimelineStore((s) => s.toggleFollowMode);
   const bumpMapsVersion = useTimelineStore((s) => s.bumpMapsVersion);
+  const setCurrentTime = useTimelineStore((s) => s.setCurrentTime);
 
   // Local state
   const [videoUrl, setVideoUrl] = useState("");
@@ -76,6 +77,8 @@ function DashboardContent(): JSX.Element {
     setWarning(null);
     try {
       const map = await mapsApi.getById(id);
+      setCurrentTime(0);
+      setIsPlaying(false);
       setGraphData(map.graph_data);
       if (map.video_url) {
         setVideoUrl(map.video_url);
@@ -101,6 +104,8 @@ function DashboardContent(): JSX.Element {
 
       if (result.success && result.graph) {
         setWarning(result.warning);
+        setCurrentTime(0);
+        setIsPlaying(false);
         setGraphData(result.graph);
         setVideoUrl(inputUrl);
 
@@ -365,24 +370,21 @@ function DashboardContent(): JSX.Element {
                 />
               )}
 
-              {/* Legend Overlay - Hidden on mobile */}
-              <div className="hidden md:block absolute bottom-4 left-4 p-3 rounded-xl bg-black/40 backdrop-blur-xl border border-white/10 text-xs space-y-2">
-                <p className="text-white/60 font-medium mb-2">Layout Guide</p>
-                <div className="flex items-center gap-2">
-                  <div className="w-3 h-0.5 bg-amber-400" />
-                  <span className="text-white/70">X=0 : Main Topics</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <div className="w-3 h-0.5 bg-emerald-400" />
-                  <span className="text-white/70">X=320 : Subtopics</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <div className="w-3 h-0.5 bg-fuchsia-400" />
-                  <span className="text-white/70">X=640 : Tangents</span>
-                </div>
-                <div className="pt-1 border-t border-white/10 mt-2">
-                  <span className="text-white/50">Y = Time (100px/min)</span>
-                </div>
+              {/* Legend - hidden on mobile */}
+              <div className="hidden md:flex absolute top-3 left-3 z-10 items-center gap-4 rounded-full border border-border bg-card px-4 py-1.5 text-xs text-muted-foreground pointer-events-none">
+                <span className="flex items-center gap-1.5">
+                  <span className="h-0.5 w-3 rounded-full bg-node-main" />
+                  Main topic
+                </span>
+                <span className="flex items-center gap-1.5">
+                  <span className="h-0.5 w-3 rounded-full bg-node-subtopic" />
+                  Subtopic
+                </span>
+                <span className="flex items-center gap-1.5">
+                  <span className="h-0.5 w-3 rounded-full bg-node-tangent" />
+                  Tangent
+                </span>
+                <span className="text-muted-foreground/70">Time flows down</span>
               </div>
             </div>
           </div>
