@@ -134,6 +134,7 @@ export interface AIGraphResponse {
 export interface ProcessTranscriptResponse {
   success: boolean;
   message: string;
+  warning: string | null;
   video_id: string | null;
   title: string | null;
   graph: AIGraphResponse | null;

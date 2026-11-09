@@ -15,6 +15,9 @@ from app.models.graph import AIGraphResponse, ProcessedEdge, ProcessedNode
 
 logger = logging.getLogger(__name__)
 
+# Longer transcripts are cut to this length (about 25k tokens)
+MAX_TRANSCRIPT_CHARS = 100_000
+
 
 SYSTEM_PROMPT = """You are an expert conversation analyst. Your task is to analyze video transcripts and extract a structured conversation graph that shows the flow of topics, tangents, and how discussions connect.
 
@@ -134,13 +137,15 @@ class TranscriptProcessor:
             raise AIProcessingError("Transcript is empty")
 
         # Truncate very long transcripts to avoid token limits
-        # Gemini 1.5 Pro has a large context window but we want to be safe
-        max_chars = 100000  # ~25k tokens estimate
-        if len(transcript) > max_chars:
+        if len(transcript) > MAX_TRANSCRIPT_CHARS:
             logger.warning(
-                f"Transcript truncated from {len(transcript)} to {max_chars} chars"
+                f"Transcript truncated from {len(transcript)} "
+                f"to {MAX_TRANSCRIPT_CHARS} chars"
             )
-            transcript = transcript[:max_chars] + "\n\n[... transcript truncated ...]"
+            transcript = (
+                transcript[:MAX_TRANSCRIPT_CHARS]
+                + "\n\n[... transcript truncated ...]"
+            )
 
         messages = [
             SystemMessage(content=SYSTEM_PROMPT),

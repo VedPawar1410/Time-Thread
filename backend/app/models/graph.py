@@ -173,6 +173,7 @@ class ProcessTranscriptResponse(BaseModel):
 
     success: bool
     message: str
+    warning: str | None = None
     video_id: str | None = None
     title: str | None = None
     graph: AIGraphResponse | None = None

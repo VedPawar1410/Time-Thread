@@ -2,16 +2,21 @@
 
 import logging
 
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, Body, HTTPException, status
 
 from app.models.graph import (
     AIGraphResponse,
     ProcessTranscriptRequest,
     ProcessTranscriptResponse,
 )
-from app.services.processor import AIProcessingError, get_processor
+from app.services.processor import (
+    MAX_TRANSCRIPT_CHARS,
+    AIProcessingError,
+    get_processor,
+)
 from app.services.transcription import (
     InvalidVideoURLError,
+    TranscriptBlockedError,
     TranscriptNotFoundError,
     YouTubeTranscriber,
 )
@@ -72,6 +77,11 @@ async def process_transcript(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=str(e),
         )
+    except TranscriptBlockedError as e:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=str(e),
+        )
     except TranscriptNotFoundError as e:
         logger.warning(f"No transcript found: {youtube_url}")
         raise HTTPException(
@@ -111,9 +121,19 @@ async def process_transcript(
             detail=f"Processing failed: {str(e)}",
         )
 
+    transcript_length = len(transcript_result.full_text)
+    warning = None
+    if transcript_length > MAX_TRANSCRIPT_CHARS:
+        analyzed_percent = round(MAX_TRANSCRIPT_CHARS / transcript_length * 100)
+        warning = (
+            f"This video is very long, so only the first {analyzed_percent}% "
+            f"of its transcript was analyzed."
+        )
+
     return ProcessTranscriptResponse(
         success=True,
         message="Transcript processed successfully",
+        warning=warning,
         video_id=video_id,
         title=None,  # Could be fetched separately if needed
         graph=graph,
@@ -127,7 +147,7 @@ async def process_transcript(
     summary="Analyze raw transcript text",
     description="Process raw transcript text directly (for testing or non-YouTube sources)",
 )
-async def analyze_transcript(transcript: str) -> AIGraphResponse:
+async def analyze_transcript(transcript: str = Body(...)) -> AIGraphResponse:
     """
     Analyze raw transcript text and return graph structure.
 

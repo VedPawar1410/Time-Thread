@@ -11,8 +11,13 @@ from xml.etree.ElementTree import ParseError as XMLParseError
 from pydantic import BaseModel
 from youtube_transcript_api import YouTubeTranscriptApi
 from youtube_transcript_api._errors import (
+    AgeRestricted,
+    InvalidVideoId,
     NoTranscriptFound,
+    RequestBlocked,
     TranscriptsDisabled,
+    VideoUnavailable,
+    VideoUnplayable,
 )
 
 logger = logging.getLogger(__name__)
@@ -53,6 +58,12 @@ class TranscriptNotFoundError(Exception):
     pass
 
 
+class TranscriptBlockedError(Exception):
+    """Raised when YouTube refuses transcript requests from this server's IP."""
+
+    pass
+
+
 class InvalidVideoURLError(Exception):
     """Raised when the YouTube URL is invalid."""
 
@@ -77,6 +88,8 @@ def extract_video_id(url_or_id: str) -> str:
     - youtu.be/VIDEO_ID
     - youtube.com/embed/VIDEO_ID
     - youtube.com/v/VIDEO_ID
+    - youtube.com/shorts/VIDEO_ID
+    - youtube.com/live/VIDEO_ID
     - Raw VIDEO_ID (11 chars)
 
     Raises:
@@ -87,7 +100,7 @@ def extract_video_id(url_or_id: str) -> str:
         return url_or_id
 
     # Standard youtube.com/watch?v= format
-    match = re.search(r"(?:youtube\.com/watch\?v=|youtu\.be/|youtube\.com/embed/|youtube\.com/v/)([a-zA-Z0-9_-]{11})", url_or_id)
+    match = re.search(r"(?:youtube\.com/watch\?v=|youtu\.be/|youtube\.com/embed/|youtube\.com/v/|youtube\.com/shorts/|youtube\.com/live/)([a-zA-Z0-9_-]{11})", url_or_id)
     if match:
         return match.group(1)
 
@@ -127,9 +140,17 @@ class YouTubeTranscriber(BaseTranscriber):
         Returns:
             Tuple of (transcript_data, language_code)
         """
-        # Fetch transcript - the new API automatically picks the best available
-        # transcript (prefers manual over auto-generated, English if available)
-        transcript = self._api.fetch(video_id)
+        # Prefer English (manual over auto-generated), otherwise use whatever
+        # language the video has. fetch() alone would only ever ask for English.
+        transcripts = self._api.list(video_id)
+        try:
+            chosen = transcripts.find_transcript(["en"])
+        except NoTranscriptFound:
+            available = list(transcripts)
+            if not available:
+                return [], ""
+            chosen = available[0]
+        transcript = chosen.fetch()
 
         # Convert FetchedTranscriptSnippet objects to dicts
         transcript_data = []
@@ -165,6 +186,18 @@ class YouTubeTranscriber(BaseTranscriber):
                 self._fetch_transcript_sync, video_id
             )
 
+        except RequestBlocked:
+            logger.warning(f"YouTube blocked the request for video: {video_id}")
+            raise TranscriptBlockedError(
+                "YouTube is temporarily blocking transcript requests from this "
+                "server. Please try again later."
+            )
+        except (VideoUnavailable, InvalidVideoId, VideoUnplayable, AgeRestricted):
+            logger.warning(f"Video cannot be read: {video_id}")
+            raise TranscriptNotFoundError(
+                f"This video can't be read. It may be private, deleted or "
+                f"age-restricted. Video ID: {video_id}"
+            )
         except TranscriptsDisabled:
             logger.warning(f"Transcripts disabled for video: {video_id}")
             raise TranscriptNotFoundError(

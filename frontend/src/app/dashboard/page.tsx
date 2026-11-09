@@ -59,6 +59,7 @@ function DashboardContent(): JSX.Element {
   const [graphData, setGraphData] = useState<AIGraphResponse>(demoGraphData);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [warning, setWarning] = useState<string | null>(null);
   // Sidebar hidden on mobile by default
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [videoCollapsed, setVideoCollapsed] = useState(false);
@@ -95,11 +96,13 @@ function DashboardContent(): JSX.Element {
 
     setLoading(true);
     setError(null);
+    setWarning(null);
 
     try {
       const result = await api.processTranscript(inputUrl);
 
       if (result.success && result.graph) {
+        setWarning(result.warning);
         setGraphData(result.graph);
         setVideoUrl(inputUrl);
 
@@ -292,6 +295,13 @@ function DashboardContent(): JSX.Element {
           {error && (
             <div className="px-6 py-2 bg-red-500/10 border-b border-red-500/20 text-red-400 text-sm">
               {error}
+            </div>
+          )}
+
+          {/* Non-fatal warning, e.g. a truncated transcript */}
+          {warning && (
+            <div className="px-6 py-2 bg-amber-500/10 border-b border-amber-500/20 text-amber-400 text-sm">
+              {warning}
             </div>
           )}
 
