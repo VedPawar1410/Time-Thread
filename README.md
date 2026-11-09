@@ -180,8 +180,10 @@ cp .env.example .env
 Fill in `GOOGLE_API_KEY`, `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY`, then:
 
 ```bash
-uvicorn app.main:app --port 8000
+python -m uvicorn app.main:app --port 8000
 ```
+
+If you already have a `backend/venv` from an older version, delete it and create a new one, because pip won't upgrade packages it thinks are already fine.
 
 **3. Frontend**, in a second terminal:
 
@@ -226,7 +228,7 @@ Docker Compose reads its variables from a `.env` file in the repo root. The file
 - Graph quality hasn't been evaluated, and timestamps from the model aren't validated.
 - No accounts: every map is visible to anyone who can reach the backend.
 - Two npm audit findings remain, both from PostCSS bundled in Next.js. They need an attacker-controlled stylesheet at build time, and this app processes none. The fix is Next.js 16.
-- Follow-mode auto-centering wasn't specifically tested.
+- Under `npm run dev`, a saved map can take over 15 seconds to appear on first load. The production build is faster.
 
 ## Learning log: mistakes and what I learned
 
