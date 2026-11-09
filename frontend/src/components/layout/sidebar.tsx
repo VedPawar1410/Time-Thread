@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import {
@@ -12,9 +12,11 @@ import {
   Plus,
   FolderOpen,
   Loader2,
+  Pencil,
   Trash2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import {
@@ -75,6 +77,9 @@ export function Sidebar(): JSX.Element {
   const [recentMaps, setRecentMaps] = useState<RecentMap[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadFailed, setLoadFailed] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editingName, setEditingName] = useState("");
+  const cancelEditRef = useRef(false);
   const searchParams = useSearchParams();
   const currentMapId = searchParams.get("map");
   const mapsVersion = useTimelineStore((s) => s.mapsVersion);
@@ -110,6 +115,37 @@ export function Sidebar(): JSX.Element {
         console.error("Failed to delete map:", error);
         alert("Could not delete this map. Please try again.");
       }
+    }
+  };
+
+  const startEditing = (map: RecentMap, e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setEditingName(map.name);
+    setEditingId(map.id);
+  };
+
+  // Every way out of editing goes through blur, so a name is saved only once
+  const finishEditing = async (map: RecentMap) => {
+    const cancelled = cancelEditRef.current;
+    cancelEditRef.current = false;
+    setEditingId(null);
+
+    const name = editingName.trim();
+    if (cancelled || !name || name === map.name) return;
+
+    const setName = (value: string) =>
+      setRecentMaps((prev) =>
+        prev.map((m) => (m.id === map.id ? { ...m, name: value } : m))
+      );
+
+    setName(name);
+    try {
+      await mapsApi.rename(map.id, name);
+    } catch (error) {
+      console.error("Failed to rename map:", error);
+      setName(map.name);
+      alert("Could not rename this map. Please try again.");
     }
   };
 
@@ -206,29 +242,61 @@ export function Sidebar(): JSX.Element {
                   <ul className="space-y-1 px-2">
                     {recentMaps.map((map) => (
                       <li key={map.id}>
-                        <Link
-                          href={`/dashboard?map=${map.id}`}
-                          className={cn(
-                            "group flex items-center gap-2 px-2 py-2 rounded-md text-sm transition-colors",
-                            currentMapId === map.id
-                              ? "bg-primary/10 text-primary"
-                              : "text-muted-foreground hover:text-foreground hover:bg-secondary"
-                          )}
-                        >
-                          <FolderOpen className="h-4 w-4 flex-shrink-0" />
-                          <div className="flex-1 min-w-0">
-                            <p className="truncate font-medium">{map.name}</p>
-                            <p className="text-xs text-muted-foreground/70">
-                              {formatRelativeTime(map.updated_at)}
-                            </p>
+                        {editingId === map.id ? (
+                          <div className="flex items-center gap-2 px-2 py-2">
+                            <FolderOpen className="h-4 w-4 flex-shrink-0 text-muted-foreground" />
+                            <Input
+                              autoFocus
+                              aria-label="Map name"
+                              maxLength={255}
+                              value={editingName}
+                              onChange={(e) => setEditingName(e.target.value)}
+                              onFocus={(e) => e.target.select()}
+                              onBlur={() => finishEditing(map)}
+                              onKeyDown={(e) => {
+                                if (e.key === "Enter") {
+                                  e.currentTarget.blur();
+                                } else if (e.key === "Escape") {
+                                  cancelEditRef.current = true;
+                                  e.currentTarget.blur();
+                                }
+                              }}
+                              className="h-7 text-sm"
+                            />
                           </div>
-                          <button
-                            onClick={(e) => handleDeleteMap(map.id, e)}
-                            className="opacity-0 group-hover:opacity-100 p-1 hover:text-red-400 transition-opacity"
+                        ) : (
+                          <Link
+                            href={`/dashboard?map=${map.id}`}
+                            className={cn(
+                              "group flex items-center gap-2 px-2 py-2 rounded-md text-sm transition-colors",
+                              currentMapId === map.id
+                                ? "bg-primary/10 text-primary"
+                                : "text-muted-foreground hover:text-foreground hover:bg-secondary"
+                            )}
                           >
-                            <Trash2 className="h-3 w-3" />
-                          </button>
-                        </Link>
+                            <FolderOpen className="h-4 w-4 flex-shrink-0" />
+                            <div className="flex-1 min-w-0">
+                              <p className="truncate font-medium">{map.name}</p>
+                              <p className="text-xs text-muted-foreground/70">
+                                {formatRelativeTime(map.updated_at)}
+                              </p>
+                            </div>
+                            <button
+                              onClick={(e) => startEditing(map, e)}
+                              aria-label="Rename map"
+                              className="opacity-0 group-hover:opacity-100 focus-visible:opacity-100 p-1 hover:text-primary transition-opacity"
+                            >
+                              <Pencil className="h-3 w-3" />
+                            </button>
+                            <button
+                              onClick={(e) => handleDeleteMap(map.id, e)}
+                              aria-label="Delete map"
+                              className="opacity-0 group-hover:opacity-100 focus-visible:opacity-100 p-1 hover:text-red-400 transition-opacity"
+                            >
+                              <Trash2 className="h-3 w-3" />
+                            </button>
+                          </Link>
+                        )}
                       </li>
                     ))}
                   </ul>

@@ -69,6 +69,14 @@ export const mapsApi = {
     return result.data;
   },
 
+  async rename(id: string, name: string): Promise<MapRecord> {
+    const result = await mapsRequest<{ data: MapRecord }>(`/${id}`, {
+      method: "PUT",
+      body: JSON.stringify({ name }),
+    });
+    return result.data;
+  },
+
   async delete(id: string): Promise<void> {
     await mapsRequest(`/${id}`, { method: "DELETE" });
   },

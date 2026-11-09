@@ -9,6 +9,7 @@ python-dotenv==1.0.1  # pydantic-settings needs this to read .env
 
 # Supabase client
 supabase==2.34.1
+websockets==15.0.1  # supabase's realtime needs 13+ but only declares >=11
 
 # AI Processing
 google-generativeai==0.8.3

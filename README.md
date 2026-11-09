@@ -228,8 +228,6 @@ Docker Compose reads its variables from a `.env` file in the repo root. The file
 - Graph quality hasn't been evaluated, and timestamps from the model aren't validated.
 - No accounts: every map is visible to anyone who can reach the backend.
 - Two npm audit findings remain, both from PostCSS bundled in Next.js. They need an attacker-controlled stylesheet at build time, and this app processes none. The fix is Next.js 16.
-- Under `npm run dev`, a saved map can take over 15 seconds to appear on first load. The production build is faster.
-
 ## Learning log: mistakes and what I learned
 
 I built this in two layers: a fast first version, then a rebuild where I found out what had never worked. Each layer records what went wrong and the lesson.
@@ -304,7 +302,7 @@ One rebuild mistake is worth recording: my CORS fix in 2.1 broke the JSON format
 - Show progress during the 10 to 30 second wait.
 - Cache results by video ID to save quota and YouTube requests.
 - Replace the fake demo graph with an empty state.
-- Rename maps, and save edits and node positions.
+- Save graph edits and node positions.
 - Add PDF, audio and long-document input.
 - From the original plan: searchable nodes, topic importance scoring, sentiment mapping, comparing speakers' perspectives, exportable maps.
 - Build proper pages for import, history and settings.
