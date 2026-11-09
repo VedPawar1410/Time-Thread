@@ -63,7 +63,7 @@ export const VideoPlayer = forwardRef<ReactPlayerInstance, VideoPlayerProps>(
             className
           )}
         >
-          <Youtube className="h-12 w-12 text-amber-400/50" />
+          <Youtube className="h-12 w-12 text-primary/50" />
           <p className="text-sm text-white/50">No video loaded</p>
         </div>
       );
@@ -97,7 +97,7 @@ export const VideoPlayer = forwardRef<ReactPlayerInstance, VideoPlayerProps>(
         {/* Loading overlay */}
         {!ready && (
           <div className="absolute inset-0 flex items-center justify-center bg-black/80 z-10">
-            <Loader2 className="h-8 w-8 animate-spin text-amber-400" />
+            <Loader2 className="h-8 w-8 animate-spin text-primary" />
           </div>
         )}
 

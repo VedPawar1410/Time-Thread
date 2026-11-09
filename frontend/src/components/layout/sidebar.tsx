@@ -163,7 +163,7 @@ export function Sidebar(): JSX.Element {
             <GitBranch className="h-5 w-5 text-primary" />
           </div>
           {!collapsed && (
-            <span className="font-semibold text-lg tracking-tight">
+            <span className="font-display text-xl tracking-tight">
               Time<span className="text-primary">-</span>Thread
             </span>
           )}

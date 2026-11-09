@@ -4,74 +4,43 @@
 
 @layer base {
   :root {
-    /* Warm, sophisticated dark theme inspired by IDE aesthetics */
-    --background: 240 10% 3.9%;
-    --foreground: 0 0% 98%;
-    --card: 240 10% 5.9%;
-    --card-foreground: 0 0% 98%;
-    --popover: 240 10% 5.9%;
-    --popover-foreground: 0 0% 98%;
-    --primary: 47 96% 53%;
-    --primary-foreground: 240 10% 3.9%;
-    --secondary: 240 5% 14%;
-    --secondary-foreground: 0 0% 98%;
-    --muted: 240 5% 14%;
-    --muted-foreground: 240 5% 64%;
-    --accent: 240 5% 14%;
-    --accent-foreground: 0 0% 98%;
-    --destructive: 0 62% 50%;
-    --destructive-foreground: 0 0% 98%;
-    --border: 240 5% 17%;
-    --input: 240 5% 17%;
-    --ring: 47 96% 53%;
-    --radius: 0.625rem;
+    /* The Loom: indigo ink, parchment text, one silk colour per thread */
+    --background: 228 38% 7%;
+    --foreground: 42 38% 92%;
+    --card: 228 32% 10%;
+    --card-foreground: 42 38% 92%;
+    --popover: 228 32% 11%;
+    --popover-foreground: 42 38% 92%;
+    --primary: 38 90% 62%;
+    --primary-foreground: 228 38% 8%;
+    --secondary: 228 24% 16%;
+    --secondary-foreground: 42 38% 92%;
+    --muted: 228 24% 16%;
+    --muted-foreground: 226 16% 70%;
+    --accent: 228 24% 17%;
+    --accent-foreground: 42 38% 92%;
+    --destructive: 356 72% 62%;
+    --destructive-foreground: 228 38% 8%;
+    --border: 228 22% 20%;
+    --input: 228 22% 22%;
+    --ring: 38 90% 62%;
+    --radius: 0.75rem;
 
     /* Chart colors */
-    --chart-1: 47 96% 53%;
-    --chart-2: 173 58% 39%;
-    --chart-3: 197 37% 24%;
-    --chart-4: 43 74% 66%;
-    --chart-5: 27 87% 67%;
+    --chart-1: 38 90% 62%;
+    --chart-2: 168 48% 58%;
+    --chart-3: 346 74% 70%;
+    --chart-4: 42 38% 80%;
+    --chart-5: 226 16% 60%;
 
-    /* Node type colors */
-    --node-topic: 47 96% 53%;
-    --node-subtopic: 173 58% 45%;
-    --node-question: 262 83% 58%;
-    --node-answer: 142 71% 45%;
-    --node-insight: 27 87% 67%;
-    --node-main: 47 96% 53%;
-    --node-tangent: 292 84% 61%;
-  }
-
-  .light {
-    --background: 0 0% 100%;
-    --foreground: 240 10% 3.9%;
-    --card: 0 0% 100%;
-    --card-foreground: 240 10% 3.9%;
-    --popover: 0 0% 100%;
-    --popover-foreground: 240 10% 3.9%;
-    --primary: 47 96% 45%;
-    --primary-foreground: 0 0% 100%;
-    --secondary: 240 4.8% 95.9%;
-    --secondary-foreground: 240 5.9% 10%;
-    --muted: 240 4.8% 95.9%;
-    --muted-foreground: 240 3.8% 46.1%;
-    --accent: 240 4.8% 95.9%;
-    --accent-foreground: 240 5.9% 10%;
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 0 0% 98%;
-    --border: 240 5.9% 90%;
-    --input: 240 5.9% 90%;
-    --ring: 47 96% 45%;
-
-    /* Node type colors - light mode */
-    --node-topic: 47 96% 45%;
-    --node-subtopic: 173 58% 35%;
-    --node-question: 262 83% 48%;
-    --node-answer: 142 71% 35%;
-    --node-insight: 27 87% 57%;
-    --node-main: 47 96% 45%;
-    --node-tangent: 292 84% 51%;
+    /* Thread colors */
+    --node-main: 38 90% 62%;
+    --node-subtopic: 168 48% 58%;
+    --node-tangent: 346 74% 70%;
+    --node-topic: 38 90% 62%;
+    --node-question: 168 48% 58%;
+    --node-answer: 168 48% 58%;
+    --node-insight: 38 90% 62%;
   }
 }
 
@@ -83,6 +52,38 @@
   body {
     @apply bg-background text-foreground antialiased;
   }
+
+  h1,
+  h2,
+  h3 {
+    @apply font-display font-normal;
+  }
+}
+
+/* A faint woven cloth under soft silk-coloured glows */
+.loom-surface {
+  background-color: hsl(var(--background));
+  background-image:
+    radial-gradient(
+      1100px 560px at 82% -8%,
+      hsl(var(--node-main) / 0.08),
+      transparent 62%
+    ),
+    radial-gradient(
+      820px 480px at 18% 108%,
+      hsl(var(--node-tangent) / 0.06),
+      transparent 62%
+    ),
+    repeating-linear-gradient(
+      0deg,
+      hsl(var(--foreground) / 0.014) 0 1px,
+      transparent 1px 5px
+    ),
+    repeating-linear-gradient(
+      90deg,
+      hsl(var(--foreground) / 0.014) 0 1px,
+      transparent 1px 5px
+    );
 }
 
 /* React Flow custom styles */
@@ -249,6 +250,18 @@
 @media (max-width: 768px) {
   body.sidebar-open {
     overflow: hidden;
+  }
+}
+
+/* Respect the operating system's reduced-motion setting */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
   }
 }
 

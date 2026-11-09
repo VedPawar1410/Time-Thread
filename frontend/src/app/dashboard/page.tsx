@@ -8,7 +8,6 @@ import {
   Pause,
   Loader2,
   Youtube,
-  Search,
   PanelLeftClose,
   PanelLeft,
 } from "lucide-react";
@@ -150,7 +149,7 @@ function DashboardContent(): JSX.Element {
 
   return (
     <TooltipProvider>
-      <div className="flex h-screen w-screen overflow-hidden bg-background">
+      <div className="loom-surface flex h-screen w-screen overflow-hidden">
         {/* Desktop Sidebar - Always visible, collapsible */}
         <div className="hidden md:block flex-shrink-0">
           <Sidebar />
@@ -173,49 +172,70 @@ function DashboardContent(): JSX.Element {
 
         {/* Main Content Area */}
         <main className="flex-1 flex flex-col overflow-hidden min-w-0">
-          {/* Header */}
-          <header className="h-14 border-b border-border bg-card/50 backdrop-blur-sm flex items-center justify-between px-3 md:px-6 flex-shrink-0">
-            <div className="flex items-center gap-3">
-              {/* Mobile sidebar toggle */}
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-8 w-8 md:hidden"
-                onClick={() => setSidebarOpen(!sidebarOpen)}
-              >
-                {sidebarOpen ? (
-                  <PanelLeftClose className="h-4 w-4" />
-                ) : (
-                  <PanelLeft className="h-4 w-4" />
-                )}
-              </Button>
+          {/* Toolbar */}
+          <header className="h-16 border-b border-border bg-card/40 backdrop-blur-md flex items-center gap-2 md:gap-4 px-3 md:px-5 flex-shrink-0">
+            {/* Mobile sidebar toggle */}
+            <Button
+              variant="ghost"
+              size="icon"
+              aria-label={sidebarOpen ? "Close sidebar" : "Open sidebar"}
+              className="h-9 w-9 md:hidden flex-shrink-0"
+              onClick={() => setSidebarOpen(!sidebarOpen)}
+            >
+              {sidebarOpen ? (
+                <PanelLeftClose className="h-4 w-4" />
+              ) : (
+                <PanelLeft className="h-4 w-4" />
+              )}
+            </Button>
 
-              <div className="hidden sm:block">
-                <h1 className="text-lg font-semibold">Conversation Timeline</h1>
-                <p className="text-xs text-muted-foreground">
-                  Click nodes to jump • Hover for details
-                </p>
-              </div>
+            {/* The main action: weave a video into a timeline */}
+            <div className="relative flex-1 min-w-0 max-w-2xl">
+              <Youtube className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
+              <Input
+                aria-label="YouTube link"
+                value={inputUrl}
+                onChange={(e) => setInputUrl(e.target.value)}
+                placeholder="Paste a YouTube link"
+                className="h-10 rounded-full bg-background/70 pl-10 pr-24 text-sm focus-visible:ring-offset-0"
+                onKeyDown={(e) => e.key === "Enter" && handleProcess()}
+              />
+              <Button
+                size="sm"
+                onClick={handleProcess}
+                disabled={loading || !inputUrl.trim()}
+                className="absolute right-1 top-1 h-8 rounded-full px-4 gap-1.5"
+              >
+                {loading && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+                Weave
+              </Button>
             </div>
 
-            <div className="flex items-center gap-2 md:gap-4">
-              {/* Node type counts - hidden on mobile */}
-              <div className="hidden lg:flex items-center gap-2 text-xs">
-                <span className="px-2 py-1 bg-amber-500/10 text-amber-400 rounded-md border border-amber-500/20">
+            <div className="ml-auto flex items-center gap-1 md:gap-3 flex-shrink-0">
+              {/* Thread counts */}
+              <div className="hidden xl:flex items-center gap-4 text-xs text-muted-foreground mr-1">
+                <span className="flex items-center gap-1.5">
+                  <span className="h-1.5 w-1.5 rounded-full bg-node-main" />
                   {graphData.nodes.filter((n) => n.type === "main").length} main
                 </span>
-                <span className="px-2 py-1 bg-emerald-500/10 text-emerald-400 rounded-md border border-emerald-500/20">
+                <span className="flex items-center gap-1.5">
+                  <span className="h-1.5 w-1.5 rounded-full bg-node-subtopic" />
                   {graphData.nodes.filter((n) => n.type === "subtopic").length}{" "}
                   subtopics
                 </span>
-                <span className="px-2 py-1 bg-fuchsia-500/10 text-fuchsia-400 rounded-md border border-fuchsia-500/20">
+                <span className="flex items-center gap-1.5">
+                  <span className="h-1.5 w-1.5 rounded-full bg-node-tangent" />
                   {graphData.nodes.filter((n) => n.type === "tangent").length}{" "}
                   tangents
                 </span>
               </div>
 
-              {/* Divider */}
-              <div className="hidden md:block w-px h-6 bg-border" />
+              {/* Always rendered once a video is loaded, so controls don't shift */}
+              {videoUrl && (
+                <span className="hidden sm:block font-mono text-sm tabular-nums text-foreground/80 min-w-[3.5rem] text-right">
+                  {formatTime(currentTime)}
+                </span>
+              )}
 
               {/* Playback controls */}
               <Tooltip>
@@ -223,9 +243,11 @@ function DashboardContent(): JSX.Element {
                   <Button
                     variant="ghost"
                     size="icon"
+                    aria-label={isPlaying ? "Pause" : "Play"}
+                    disabled={!videoUrl}
                     onClick={() => setIsPlaying(!isPlaying)}
                     className={cn(
-                      "h-8 w-8",
+                      "h-9 w-9 rounded-full",
                       isPlaying && "text-primary bg-primary/10"
                     )}
                   >
@@ -245,11 +267,13 @@ function DashboardContent(): JSX.Element {
                   <Button
                     variant="ghost"
                     size="sm"
+                    aria-pressed={followMode}
+                    aria-label="Follow the active topic"
                     onClick={toggleFollowMode}
                     className={cn(
-                      "h-8 gap-1 md:gap-2 text-xs",
+                      "h-9 rounded-full gap-1.5 text-xs",
                       followMode
-                        ? "text-primary bg-primary/10 border border-primary/30"
+                        ? "text-primary bg-primary/10"
                         : "text-muted-foreground"
                     )}
                   >
@@ -259,57 +283,26 @@ function DashboardContent(): JSX.Element {
                 </TooltipTrigger>
                 <TooltipContent>
                   {followMode
-                    ? "Auto-center on active node"
-                    : "Enable auto-centering"}
+                    ? "The view follows the active topic"
+                    : "Let the view follow the active topic"}
                 </TooltipContent>
               </Tooltip>
-
-              {/* Current timestamp */}
-              {currentTime > 0 && (
-                <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 bg-primary/10 text-primary rounded-lg border border-primary/20">
-                  <span className="font-mono font-medium text-sm">
-                    {formatTime(currentTime)}
-                  </span>
-                </div>
-              )}
             </div>
           </header>
 
-          {/* URL Input Bar */}
-          <div className="h-12 border-b border-border bg-card/30 flex items-center gap-2 px-3 md:px-6 flex-shrink-0">
-            <Youtube className="h-4 w-4 text-red-500 flex-shrink-0" />
-            <Input
-              value={inputUrl}
-              onChange={(e) => setInputUrl(e.target.value)}
-              placeholder="Paste YouTube URL and press Enter..."
-              className="flex-1 h-8 bg-background/50 border-white/10 text-sm"
-              onKeyDown={(e) => e.key === "Enter" && handleProcess()}
-            />
-            <Button
-              size="sm"
-              onClick={handleProcess}
-              disabled={loading || !inputUrl.trim()}
-              className="h-8 gap-2"
-            >
-              {loading ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                <Search className="h-4 w-4" />
-              )}
-              <span className="hidden sm:inline">Process</span>
-            </Button>
-          </div>
-
           {/* Error message */}
           {error && (
-            <div className="px-6 py-2 bg-red-500/10 border-b border-red-500/20 text-red-400 text-sm">
+            <div
+              role="alert"
+              className="px-6 py-2 bg-destructive/10 border-b border-destructive/20 text-destructive text-sm"
+            >
               {error}
             </div>
           )}
 
           {/* Non-fatal warning, e.g. a truncated transcript */}
           {warning && (
-            <div className="px-6 py-2 bg-amber-500/10 border-b border-amber-500/20 text-amber-400 text-sm">
+            <div className="px-6 py-2 bg-primary/10 border-b border-primary/20 text-primary text-sm">
               {warning}
             </div>
           )}
@@ -356,9 +349,9 @@ function DashboardContent(): JSX.Element {
             {/* Graph Canvas */}
             <div className="flex-1 relative min-h-0">
               {loading ? (
-                <div className="w-full h-full flex items-center justify-center bg-background">
+                <div className="w-full h-full flex items-center justify-center">
                   <div className="flex flex-col items-center gap-4">
-                    <Loader2 className="h-10 w-10 animate-spin text-amber-400" />
+                    <Loader2 className="h-10 w-10 animate-spin text-primary" />
                     <p className="text-sm text-muted-foreground">
                       Analyzing transcript...
                     </p>
@@ -368,7 +361,7 @@ function DashboardContent(): JSX.Element {
                 <TimelineCanvas
                   graphData={graphData}
                   onSeekTo={handleSeekTo}
-                  className="w-full h-full bg-background"
+                  className="w-full h-full"
                 />
               )}
 
@@ -404,7 +397,7 @@ export default function DashboardPage(): JSX.Element {
     <Suspense
       fallback={
         <div className="flex h-screen w-screen items-center justify-center bg-background">
-          <Loader2 className="h-10 w-10 animate-spin text-amber-400" />
+          <Loader2 className="h-10 w-10 animate-spin text-primary" />
         </div>
       }
     >
