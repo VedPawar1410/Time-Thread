@@ -1,5 +1,6 @@
-"""AI-powered transcript processor using Gemini 1.5 Pro."""
+"""AI-powered transcript processor using Gemini."""
 
+import asyncio
 import json
 import logging
 from typing import Any
@@ -104,10 +105,13 @@ class TranscriptProcessor:
             )
 
         self.llm = ChatGoogleGenerativeAI(
-            model="gemini-1.5-flash",  # Gemini 1.5 Flash
+            model=settings.gemini_model,
             google_api_key=settings.google_api_key,
             temperature=0.3,  # Lower temperature for more consistent structured output
             max_output_tokens=8192,
+            timeout=120,  # Fail with an error rather than hang on a stuck model
+            max_retries=2,
+            transport="rest",  # The default gRPC transport hangs on generate calls
         )
         self.parser = JsonOutputParser(pydantic_object=AIGraphResponse)
 
@@ -151,7 +155,9 @@ Remember: Return ONLY the JSON object with "nodes" and "edges" arrays."""
         ]
 
         try:
-            response = await self.llm.ainvoke(messages)
+            # ainvoke is broken with REST in this library version, so run the
+            # sync call in a worker thread to keep the event loop free.
+            response = await asyncio.to_thread(self.llm.invoke, messages)
             response_text = response.content
 
             # Clean up response if it contains markdown code blocks

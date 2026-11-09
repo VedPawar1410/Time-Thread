@@ -1,18 +1,10 @@
 """Application configuration using Pydantic Settings."""
 
-import os
 from functools import lru_cache
+from typing import Annotated
 
-from pydantic_settings import BaseSettings, SettingsConfigDict
-
-
-def parse_cors_origins(v: str | list[str]) -> list[str]:
-    """Parse CORS origins from env variable or list."""
-    if isinstance(v, list):
-        return v
-    if isinstance(v, str):
-        return [origin.strip() for origin in v.split(",") if origin.strip()]
-    return ["http://localhost:3000"]
+from pydantic import field_validator
+from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 
 
 class Settings(BaseSettings):
@@ -29,8 +21,9 @@ class Settings(BaseSettings):
     app_version: str = "0.1.0"
     debug: bool = False
 
-    # CORS - Supports comma-separated string from env
-    cors_origins: list[str] = ["http://localhost:3000"]
+    # CORS - comma-separated in the environment. NoDecode stops pydantic-settings
+    # from parsing the value as JSON before split_cors_origins sees it.
+    cors_origins: Annotated[list[str], NoDecode] = ["http://localhost:3000"]
 
     # Supabase
     supabase_url: str = ""
@@ -42,13 +35,16 @@ class Settings(BaseSettings):
 
     # Google Gemini
     google_api_key: str = ""
+    # Google retires model names, so keep this overridable without a code change.
+    gemini_model: str = "gemini-3.5-flash"
 
-    def __init__(self, **data):
-        super().__init__(**data)
-        # Parse CORS origins from environment if set as comma-separated string
-        cors_env = os.environ.get("CORS_ORIGINS", "")
-        if cors_env:
-            self.cors_origins = parse_cors_origins(cors_env)
+    @field_validator("cors_origins", mode="before")
+    @classmethod
+    def split_cors_origins(cls, value: str | list[str]) -> str | list[str]:
+        """Turn a comma-separated CORS_ORIGINS value into a list."""
+        if isinstance(value, str):
+            return [origin.strip() for origin in value.split(",") if origin.strip()]
+        return value
 
 
 @lru_cache
