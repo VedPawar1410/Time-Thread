@@ -26,7 +26,8 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
-import { mapsApi } from "@/lib/supabase";
+import { mapsApi } from "@/lib/api";
+import { useTimelineStore } from "@/stores/timeline-store";
 
 /** Minimal map data for sidebar display */
 interface RecentMap {
@@ -85,21 +86,25 @@ export function Sidebar(): JSX.Element {
   const [collapsed, setCollapsed] = useState(false);
   const [recentMaps, setRecentMaps] = useState<RecentMap[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadFailed, setLoadFailed] = useState(false);
   const searchParams = useSearchParams();
   const currentMapId = searchParams.get("map");
+  const mapsVersion = useTimelineStore((s) => s.mapsVersion);
 
-  // Fetch recent maps on mount
+  // Fetch recent maps on mount and whenever a map is saved
   useEffect(() => {
     loadRecentMaps();
-  }, []);
+  }, [mapsVersion]);
 
   const loadRecentMaps = async () => {
     setLoading(true);
+    setLoadFailed(false);
     try {
       const maps = await mapsApi.getRecent(10);
       setRecentMaps(maps);
     } catch (error) {
       console.error("Failed to load recent maps:", error);
+      setLoadFailed(true);
     } finally {
       setLoading(false);
     }
@@ -110,8 +115,13 @@ export function Sidebar(): JSX.Element {
     e.stopPropagation();
 
     if (confirm("Delete this map?")) {
-      await mapsApi.delete(id);
-      setRecentMaps((prev) => prev.filter((m) => m.id !== id));
+      try {
+        await mapsApi.delete(id);
+        setRecentMaps((prev) => prev.filter((m) => m.id !== id));
+      } catch (error) {
+        console.error("Failed to delete map:", error);
+        alert("Could not delete this map. Please try again.");
+      }
     }
   };
 
@@ -195,10 +205,12 @@ export function Sidebar(): JSX.Element {
                 <div className="px-3 py-6 text-center">
                   <FolderOpen className="h-8 w-8 text-muted-foreground/50 mx-auto mb-2" />
                   <p className="text-xs text-muted-foreground">
-                    No saved maps yet
+                    {loadFailed ? "Couldn't load saved maps" : "No saved maps yet"}
                   </p>
                   <p className="text-xs text-muted-foreground/70 mt-1">
-                    Process a video to get started
+                    {loadFailed
+                      ? "Check that the backend is running"
+                      : "Process a video to get started"}
                   </p>
                 </div>
               ) : (

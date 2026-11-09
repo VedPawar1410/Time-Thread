@@ -35,8 +35,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
-import { api } from "@/lib/api";
-import { mapsApi } from "@/lib/supabase";
+import { api, mapsApi } from "@/lib/api";
 import type { AIGraphResponse } from "@/types/graph";
 
 function DashboardContent(): JSX.Element {
@@ -52,6 +51,7 @@ function DashboardContent(): JSX.Element {
   const isPlaying = useTimelineStore(selectIsPlaying);
   const setIsPlaying = useTimelineStore((s) => s.setIsPlaying);
   const toggleFollowMode = useTimelineStore((s) => s.toggleFollowMode);
+  const bumpMapsVersion = useTimelineStore((s) => s.bumpMapsVersion);
 
   // Local state
   const [videoUrl, setVideoUrl] = useState("");
@@ -74,14 +74,13 @@ function DashboardContent(): JSX.Element {
   const loadMap = async (id: string) => {
     setLoading(true);
     setError(null);
+    setWarning(null);
     try {
       const map = await mapsApi.getById(id);
-      if (map) {
-        setGraphData(map.graph_data);
-        if (map.video_url) {
-          setVideoUrl(map.video_url);
-          setInputUrl(map.video_url);
-        }
+      setGraphData(map.graph_data);
+      if (map.video_url) {
+        setVideoUrl(map.video_url);
+        setInputUrl(map.video_url);
       }
     } catch (err) {
       setError("Failed to load map");
@@ -106,14 +105,24 @@ function DashboardContent(): JSX.Element {
         setGraphData(result.graph);
         setVideoUrl(inputUrl);
 
-        // Save to Supabase
-        await mapsApi.create({
-          name: `Video ${result.video_id ?? "Untitled"}`,
-          video_id: result.video_id ?? undefined,
-          video_url: inputUrl,
-          graph_data: result.graph,
-          raw_transcript: result.raw_transcript ?? undefined,
-        });
+        // The graph is already on screen, so a failed save is only a warning
+        try {
+          await mapsApi.create({
+            name: `Video ${result.video_id ?? "Untitled"}`,
+            video_id: result.video_id ?? undefined,
+            video_url: inputUrl,
+            graph_data: result.graph,
+            raw_transcript: result.raw_transcript ?? undefined,
+          });
+          bumpMapsVersion();
+        } catch (saveError) {
+          console.error("Failed to save map:", saveError);
+          setWarning(
+            [result.warning, "This graph could not be saved."]
+              .filter(Boolean)
+              .join(" ")
+          );
+        }
       } else {
         setError(result.message || "Processing failed");
       }

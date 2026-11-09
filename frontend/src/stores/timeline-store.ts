@@ -15,6 +15,8 @@ interface TimelineState {
   duration: number;
   /** Whether the video is currently playing */
   isPlaying: boolean;
+  /** Increases after a map is saved so the sidebar knows to reload */
+  mapsVersion: number;
 }
 
 interface TimelineActions {
@@ -30,6 +32,8 @@ interface TimelineActions {
   setDuration: (duration: number) => void;
   /** Set playing state */
   setIsPlaying: (isPlaying: boolean) => void;
+  /** Signal that the saved maps list has changed */
+  bumpMapsVersion: () => void;
   /** Reset the store to initial state */
   reset: () => void;
 }
@@ -46,6 +50,7 @@ const initialState: TimelineState = {
   followMode: true, // Enabled by default for premium UX
   duration: 0,
   isPlaying: false,
+  mapsVersion: 0,
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -66,6 +71,9 @@ export const useTimelineStore = create<TimelineStore>((set) => ({
   setDuration: (duration) => set({ duration }),
 
   setIsPlaying: (isPlaying) => set({ isPlaying }),
+
+  bumpMapsVersion: () =>
+    set((state) => ({ mapsVersion: state.mapsVersion + 1 })),
 
   reset: () => set(initialState),
 }));
