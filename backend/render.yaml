@@ -1,4 +1,4 @@
-# Render Blueprint for Time-Thread Backend
+# Render Blueprint for the Time-Thread backend
 # https://render.com/docs/blueprint-spec
 
 services:
@@ -7,20 +7,24 @@ services:
     runtime: python
     region: oregon
     plan: free
+    rootDir: backend
     buildCommand: pip install -r requirements.txt
-    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    startCommand: python -m uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /health
+    autoDeploy: true
     envVars:
       - key: PYTHON_VERSION
-        value: "3.11.0"
+        value: "3.11.9"
       - key: GOOGLE_API_KEY
         sync: false
       - key: SUPABASE_URL
         sync: false
       - key: SUPABASE_SERVICE_ROLE_KEY
         sync: false
+      # Comma-separated, for example https://your-app.vercel.app
       - key: CORS_ORIGINS
-        value: "https://time-thread.vercel.app,https://your-custom-domain.com"
-      - key: DEBUG
-        value: "false"
-    healthCheckPath: /health
-    autoDeploy: true
+        sync: false
+      - key: DAILY_PROCESS_LIMIT
+        value: "25"
+      - key: READ_ONLY_MAPS
+        value: "true"

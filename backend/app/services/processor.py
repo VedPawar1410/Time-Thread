@@ -95,6 +95,12 @@ class AIProcessingError(ProcessorError):
     pass
 
 
+class AIQuotaError(AIProcessingError):
+    """Raised when the Gemini free-tier quota is used up."""
+
+    pass
+
+
 class TranscriptProcessor:
     """Service for processing transcripts using Gemini AI."""
 
@@ -192,6 +198,10 @@ Remember: Return ONLY the JSON object with "nodes" and "edges" arrays."""
         except Exception as e:
             if isinstance(e, AIProcessingError):
                 raise
+            if "429" in str(e) or "RESOURCE_EXHAUSTED" in str(e):
+                raise AIQuotaError(
+                    "The free AI quota is used up for now. Please try again later."
+                )
             logger.exception("Unexpected error during transcript processing")
             raise AIProcessingError(f"Failed to process transcript: {str(e)}")
 

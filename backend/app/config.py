@@ -29,6 +29,10 @@ class Settings(BaseSettings):
     supabase_url: str = ""
     supabase_service_role_key: str = ""
 
+    # Public deployment safeguards (0 means no daily limit)
+    daily_process_limit: int = 0
+    read_only_maps: bool = False
+
     # Google Gemini
     google_api_key: str = ""
     # Google retires model names, so keep this overridable without a code change.

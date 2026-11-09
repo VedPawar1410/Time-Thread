@@ -29,6 +29,8 @@ import { cn } from "@/lib/utils";
 import { mapsApi } from "@/lib/api";
 import { useTimelineStore } from "@/stores/timeline-store";
 
+const READ_ONLY = process.env.NEXT_PUBLIC_READ_ONLY === "true";
+
 /** Minimal map data for sidebar display */
 interface RecentMap {
   id: string;
@@ -279,29 +281,36 @@ export function Sidebar(): JSX.Element {
                             >
                               <FolderOpen className="h-4 w-4 flex-shrink-0" />
                               {/* Touch screens have no hover, so leave room for the icons */}
-                              <div className="flex-1 min-w-0 [@media(hover:none)]:pr-14">
+                              <div
+                                className={cn(
+                                  "flex-1 min-w-0",
+                                  !READ_ONLY && "[@media(hover:none)]:pr-14"
+                                )}
+                              >
                                 <p className="truncate font-medium">{map.name}</p>
                                 <p className="text-xs text-muted-foreground/70">
                                   {formatRelativeTime(map.updated_at)}
                                 </p>
                               </div>
                             </Link>
-                            <div className="absolute right-1 top-1/2 -translate-y-1/2 flex items-center rounded-md bg-secondary opacity-0 transition-opacity group-hover:opacity-100 focus-within:opacity-100 [@media(hover:none)]:opacity-100">
-                              <button
-                                onClick={(e) => startEditing(map, e)}
-                                aria-label="Rename map"
-                                className="h-7 w-7 flex items-center justify-center rounded-md text-muted-foreground hover:text-primary transition-colors"
-                              >
-                                <Pencil className="h-3.5 w-3.5" />
-                              </button>
-                              <button
-                                onClick={(e) => handleDeleteMap(map.id, e)}
-                                aria-label="Delete map"
-                                className="h-7 w-7 flex items-center justify-center rounded-md text-muted-foreground hover:text-destructive transition-colors"
-                              >
-                                <Trash2 className="h-3.5 w-3.5" />
-                              </button>
-                            </div>
+                            {!READ_ONLY && (
+                              <div className="absolute right-1 top-1/2 -translate-y-1/2 flex items-center rounded-md bg-secondary opacity-0 transition-opacity group-hover:opacity-100 focus-within:opacity-100 [@media(hover:none)]:opacity-100">
+                                <button
+                                  onClick={(e) => startEditing(map, e)}
+                                  aria-label="Rename map"
+                                  className="h-7 w-7 flex items-center justify-center rounded-md text-muted-foreground hover:text-primary transition-colors"
+                                >
+                                  <Pencil className="h-3.5 w-3.5" />
+                                </button>
+                                <button
+                                  onClick={(e) => handleDeleteMap(map.id, e)}
+                                  aria-label="Delete map"
+                                  className="h-7 w-7 flex items-center justify-center rounded-md text-muted-foreground hover:text-destructive transition-colors"
+                                >
+                                  <Trash2 className="h-3.5 w-3.5" />
+                                </button>
+                              </div>
+                            )}
                           </>
                         )}
                       </li>

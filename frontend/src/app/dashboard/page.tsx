@@ -132,12 +132,6 @@ function DashboardContent(): JSX.Element {
     try {
       const result = await api.processTranscript(inputUrl);
 
-      // Already woven: open the saved map instead of creating a duplicate
-      if (result.map_id) {
-        router.push(`/dashboard?map=${result.map_id}`);
-        return;
-      }
-
       if (result.success && result.graph) {
         setWarning(result.warning);
         setCurrentTime(0);
@@ -145,26 +139,12 @@ function DashboardContent(): JSX.Element {
         setGraphData(result.graph);
         setVideoUrl(inputUrl);
 
-        // The graph is already on screen, so a failed save is only a warning
-        try {
-          const saved = await mapsApi.create({
-            name: result.title ?? `Video ${result.video_id ?? "Untitled"}`,
-            video_id: result.video_id ?? undefined,
-            video_url: inputUrl,
-            graph_data: result.graph,
-            raw_transcript: result.raw_transcript ?? undefined,
-          });
-          savedMapIdRef.current = saved.id;
-          router.replace(`/dashboard?map=${saved.id}`);
-          bumpMapsVersion();
-        } catch (saveError) {
-          console.error("Failed to save map:", saveError);
-          setWarning(
-            [result.warning, "This graph could not be saved."]
-              .filter(Boolean)
-              .join(" ")
-          );
+        // The backend saved it. Point the URL at it without reloading.
+        if (result.map_id && result.map_id !== mapId) {
+          savedMapIdRef.current = result.map_id;
+          router.replace(`/dashboard?map=${result.map_id}`);
         }
+        bumpMapsVersion();
       } else {
         setError(result.message || "Processing failed");
       }

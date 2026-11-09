@@ -161,6 +161,25 @@ def test_missing_map_returns_404(client, method, kwargs):
     assert response.status_code == 404
 
 
+@pytest.mark.parametrize(
+    "method, path, kwargs",
+    [
+        ("post", "/api/v1/maps/", {"json": NEW_MAP}),
+        ("put", f"/api/v1/maps/{MISSING_ID}", {"json": {"name": "x"}}),
+        ("delete", f"/api/v1/maps/{MISSING_ID}", {}),
+    ],
+)
+def test_read_only_mode_blocks_changes(client, monkeypatch, method, path, kwargs):
+    monkeypatch.setattr(
+        maps_endpoint,
+        "get_settings",
+        lambda: SimpleNamespace(read_only_maps=True),
+    )
+
+    assert getattr(client, method)(path, **kwargs).status_code == 403
+    assert client.get("/api/v1/maps/recent").status_code == 200
+
+
 def test_malformed_id_returns_422(client):
     assert client.get("/api/v1/maps/not-a-uuid").status_code == 422
 

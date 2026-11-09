@@ -2,10 +2,12 @@
 
 import asyncio
 import logging
+from datetime import date
 
 from fastapi import APIRouter, Body, HTTPException, status
 
-from app.api.v1.endpoints.maps import find_map_by_video_id
+from app.api.v1.endpoints.maps import MapCreate, find_map_by_video_id, insert_map
+from app.config import get_settings
 from app.models.graph import (
     AIGraphResponse,
     ProcessTranscriptRequest,
@@ -14,6 +16,7 @@ from app.models.graph import (
 from app.services.processor import (
     MAX_TRANSCRIPT_CHARS,
     AIProcessingError,
+    AIQuotaError,
     get_processor,
 )
 from app.services.transcription import (
@@ -28,6 +31,39 @@ from app.services.transcription import (
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
+
+# In memory on purpose: a restart only happens when the server has been idle,
+# and sustained abuse keeps it awake and counted.
+_daily_usage: dict = {"day": None, "count": 0}
+
+
+def claim_daily_processing_slot() -> None:
+    """Count one AI request, or refuse it once today's limit is reached."""
+    limit = get_settings().daily_process_limit
+    if limit <= 0:
+        return
+
+    today = date.today()
+    if _daily_usage["day"] != today:
+        _daily_usage.update(day=today, count=0)
+
+    if _daily_usage["count"] >= limit:
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail=(
+                "Today's free processing limit has been reached. "
+                "Saved maps still work, and you can try again tomorrow."
+            ),
+        )
+    _daily_usage["count"] += 1
+
+
+def quota_exhausted(error: AIQuotaError) -> HTTPException:
+    """Build the response for a used-up AI quota."""
+    return HTTPException(
+        status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+        detail=str(error),
+    )
 
 
 @router.post(
@@ -92,6 +128,8 @@ async def process_transcript(
             raw_transcript=saved_map.raw_transcript,
         )
 
+    claim_daily_processing_slot()
+
     # Step 1: Fetch transcript from YouTube
     transcriber = YouTubeTranscriber()
 
@@ -127,6 +165,8 @@ async def process_transcript(
     try:
         processor = get_processor()
         graph = await processor.process_transcript(transcript_result.full_text)
+    except AIQuotaError as e:
+        raise quota_exhausted(e)
     except ValueError as e:
         # Missing API key configuration
         logger.error(f"Configuration error: {e}")
@@ -156,12 +196,33 @@ async def process_transcript(
             f"of its transcript was analyzed."
         )
 
+    title = await fetch_video_title(video_id)
+
+    # Saved here, not by the browser, so visitors can't write arbitrary maps
+    map_id = None
+    try:
+        saved = await asyncio.to_thread(
+            insert_map,
+            MapCreate(
+                name=(title or f"Video {video_id}")[:255],
+                video_id=video_id,
+                video_url=youtube_url,
+                graph_data=graph,
+                raw_transcript=transcript_result.full_text,
+            ),
+        )
+        map_id = saved.id
+    except Exception as e:
+        logger.error(f"Failed to save map for {video_id}: {e}")
+        warning = " ".join(filter(None, [warning, "This graph could not be saved."]))
+
     return ProcessTranscriptResponse(
         success=True,
         message="Transcript processed successfully",
         warning=warning,
+        map_id=map_id,
         video_id=video_id,
-        title=await fetch_video_title(video_id),
+        title=title,
         graph=graph,
         raw_transcript=transcript_result.full_text,
     )
@@ -194,9 +255,13 @@ async def analyze_transcript(transcript: str = Body(...)) -> AIGraphResponse:
             detail="Transcript text is required",
         )
 
+    claim_daily_processing_slot()
+
     try:
         processor = get_processor()
         return await processor.process_transcript(transcript)
+    except AIQuotaError as e:
+        raise quota_exhausted(e)
     except ValueError as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,

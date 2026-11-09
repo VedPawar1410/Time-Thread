@@ -10,6 +10,7 @@ from app.api.v1.endpoints import process as process_endpoint
 from app.main import app
 from app.models.graph import AIGraphResponse
 from app.services import transcription
+from app.services.processor import AIQuotaError
 from app.services.transcription import YouTubeTranscriber
 
 VIDEO_ID = "dQw4w9WgXcQ"
@@ -30,7 +31,77 @@ def client(monkeypatch):
     monkeypatch.setattr(process_endpoint, "get_processor", lambda: FakeProcessor())
     monkeypatch.setattr(process_endpoint, "find_map_by_video_id", lambda video_id: None)
     monkeypatch.setattr(process_endpoint, "fetch_video_title", fake_title)
+    monkeypatch.setattr(
+        process_endpoint, "insert_map", lambda data: SimpleNamespace(id="new-id")
+    )
+    process_endpoint._daily_usage.update(day=None, count=0)
     return TestClient(app)
+
+
+def limit_daily_requests(monkeypatch, limit):
+    monkeypatch.setattr(
+        process_endpoint,
+        "get_settings",
+        lambda: SimpleNamespace(daily_process_limit=limit),
+    )
+
+
+def test_daily_limit_blocks_extra_requests(client, monkeypatch):
+    limit_daily_requests(monkeypatch, 1)
+    fake_transcript(monkeypatch, [{"text": "hi", "start": 0.0, "duration": 1.0}])
+
+    first = client.post("/api/v1/process-transcript", json=REQUEST)
+    second = client.post("/api/v1/process-transcript", json=REQUEST)
+    analyze = client.post("/api/v1/analyze", json="[00:00] hello")
+
+    assert first.status_code == 200
+    assert second.status_code == 429
+    assert analyze.status_code == 429
+
+
+def test_saved_videos_do_not_use_the_daily_limit(client, monkeypatch):
+    limit_daily_requests(monkeypatch, 1)
+    saved = SimpleNamespace(
+        id="saved-id",
+        name="Saved map",
+        graph_data=AIGraphResponse(nodes=[], edges=[]),
+        raw_transcript=None,
+    )
+    monkeypatch.setattr(process_endpoint, "find_map_by_video_id", lambda video_id: saved)
+
+    responses = [
+        client.post("/api/v1/process-transcript", json=REQUEST) for _ in range(3)
+    ]
+
+    assert [r.status_code for r in responses] == [200, 200, 200]
+
+
+def test_used_up_ai_quota_returns_503(client, monkeypatch):
+    class QuotaProcessor:
+        async def process_transcript(self, transcript):
+            raise AIQuotaError("The free AI quota is used up for now.")
+
+    monkeypatch.setattr(process_endpoint, "get_processor", lambda: QuotaProcessor())
+    fake_transcript(monkeypatch, [{"text": "hi", "start": 0.0, "duration": 1.0}])
+
+    response = client.post("/api/v1/process-transcript", json=REQUEST)
+
+    assert response.status_code == 503
+    assert "quota" in response.json()["detail"]
+
+
+def test_failed_save_still_returns_the_graph(client, monkeypatch):
+    def fail(data):
+        raise RuntimeError("database down")
+
+    monkeypatch.setattr(process_endpoint, "insert_map", fail)
+    fake_transcript(monkeypatch, [{"text": "hi", "start": 0.0, "duration": 1.0}])
+
+    response = client.post("/api/v1/process-transcript", json=REQUEST)
+
+    assert response.status_code == 200
+    assert response.json()["map_id"] is None
+    assert "could not be saved" in response.json()["warning"]
 
 
 def test_saved_video_is_reused_without_calling_youtube(client, monkeypatch):
@@ -58,7 +129,7 @@ def test_new_video_returns_its_title(client, monkeypatch):
     response = client.post("/api/v1/process-transcript", json=REQUEST)
 
     assert response.json()["title"] == "A real title"
-    assert response.json()["map_id"] is None
+    assert response.json()["map_id"] == "new-id"
 
 
 def fake_transcript(monkeypatch, entries):

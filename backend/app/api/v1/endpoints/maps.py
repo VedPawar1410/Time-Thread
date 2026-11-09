@@ -99,6 +99,21 @@ def database_error(action: str, error: Exception) -> HTTPException:
     )
 
 
+def require_writable() -> None:
+    """Block changes to saved maps on a public, read-only deployment."""
+    if get_settings().read_only_maps:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Saved maps can't be changed on this public demo",
+        )
+
+
+def insert_map(map_data: MapCreate) -> MapRecord:
+    """Save a map. The database generates the ID and timestamps."""
+    response = get_supabase().table("maps").insert(map_data.model_dump()).execute()
+    return MapRecord(**response.data[0])
+
+
 def find_map_by_video_id(video_id: str) -> MapRecord | None:
     """Find the newest saved map for a video. A failed lookup returns None."""
     try:
@@ -197,18 +212,20 @@ def get_map(map_id: UUID) -> MapResponse:
     description="Save a processed graph to the database.",
 )
 def create_map(map_data: MapCreate) -> MapResponse:
-    """Create a new map. The database generates the ID and timestamps."""
-    client = get_supabase()
+    """Create a new map."""
+    require_writable()
 
     try:
-        response = client.table("maps").insert(map_data.model_dump()).execute()
+        record = insert_map(map_data)
+    except HTTPException:
+        raise
     except Exception as e:
         raise database_error("create map", e)
 
     return MapResponse(
         success=True,
         message="Map created successfully",
-        data=MapRecord(**response.data[0]),
+        data=record,
     )
 
 
@@ -220,6 +237,7 @@ def create_map(map_data: MapCreate) -> MapResponse:
 )
 def update_map(map_id: UUID, updates: MapUpdate) -> MapResponse:
     """Update an existing map. A database trigger refreshes updated_at."""
+    require_writable()
     update_data: dict[str, Any] = updates.model_dump(exclude_unset=True)
     if not update_data:
         raise HTTPException(
@@ -253,6 +271,7 @@ def update_map(map_id: UUID, updates: MapUpdate) -> MapResponse:
 )
 def delete_map(map_id: UUID) -> dict[str, Any]:
     """Delete a map."""
+    require_writable()
     client = get_supabase()
 
     try:

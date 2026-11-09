@@ -20,15 +20,6 @@ export interface MapRecord {
 
 export type MapSummary = Pick<MapRecord, "id" | "name" | "updated_at">;
 
-export interface MapInsert {
-  name: string;
-  description?: string;
-  video_id?: string;
-  video_url?: string;
-  graph_data: AIGraphResponse;
-  raw_transcript?: string;
-}
-
 async function mapsRequest<T>(path: string, init?: RequestInit): Promise<T> {
   const response = await fetch(`${API_BASE_URL}/api/v1/maps${path}`, {
     headers: { "Content-Type": "application/json" },
@@ -59,14 +50,6 @@ export const mapsApi = {
       `/recent?limit=${limit}`
     );
     return result.maps;
-  },
-
-  async create(map: MapInsert): Promise<MapRecord> {
-    const result = await mapsRequest<{ data: MapRecord }>("/", {
-      method: "POST",
-      body: JSON.stringify(map),
-    });
-    return result.data;
   },
 
   async rename(id: string, name: string): Promise<MapRecord> {
